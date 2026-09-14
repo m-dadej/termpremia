@@ -122,6 +122,26 @@ test_that("sigma2 shifts only the intercepts, never the loadings", {
   expect_equal(r1$a[2] - r0$a[2], 0.5e-4)
 })
 
+test_that("sigma2 cancels out of the term premium entirely", {
+  # sigma2 enters A_n and A^RF_n identically, so it shifts the level of fitted
+  # and risk-neutral yields by the same amount and vanishes from their
+  # difference. Useful to know when chasing level discrepancies against another
+  # implementation: the pricing-error variance cannot be the explanation.
+  p0 <- fake_pars(sigma2 = 0)
+  p1 <- fake_pars(sigma2 = 1e-3)
+  x <- matrix(c(0.01, -0.02, 0.005, 0.001), 2, 2)
+
+  tp <- function(p) {
+    acm_yields(acm_recursion(120, p, FALSE), x, 120) -
+      acm_yields(acm_recursion(120, p, TRUE), x, 120)
+  }
+  expect_equal(tp(p0), tp(p1))
+
+  # ... while the fitted level genuinely does move
+  lvl <- function(p) acm_yields(acm_recursion(120, p, FALSE), x, 120)
+  expect_false(isTRUE(all.equal(lvl(p0), lvl(p1))))
+})
+
 test_that("zero prices of risk make the two recursions identical", {
   p <- fake_pars()
   p$lambda0 <- rep(0, 2)
