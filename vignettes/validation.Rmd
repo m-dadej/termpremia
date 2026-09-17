@@ -143,6 +143,86 @@ A shock with a 78-month half-life, observed over 763 months, gives roughly ten
 effective independent observations of the mean reversion. That parameter is
 barely estimated at all, and the risk-neutral yield is sensitive to it.
 
+## Correcting the small-sample bias
+
+Worse than imprecise, it is biased. Least squares understates autoregressive
+persistence in finite samples, and the bias grows as the process approaches a
+unit root — exactly the region interest rate factors live in. Bauer, Rudebusch
+and Wu (2012) correct it by bootstrap: simulate from a candidate `Phi`,
+re-estimate by OLS, and search for the `Phi` whose OLS estimates are centred on
+what was actually observed.
+
+```{r}
+bc <- suppressWarnings(atsm(panel, n_factors = 5, p_dynamics = "brw"))
+bc$brw$spectral_radius[c("ols", "corrected")]
+```
+
+The correction is large. In half-life terms:
+
+```{r}
+rho2 <- bc$brw$spectral_radius[c("ols", "corrected")]
+round(log(0.5) / log(rho2) / 12, 1)   # years
+```
+
+Six and a half years becomes effectively permanent. The cross-sectional fit is
+untouched — by construction, because the yield curve at a point in time carries
+no information about how fast the factors mean-revert, and this implementation
+holds the risk-adjusted dynamics fixed and lets the prices of risk absorb the
+change:
+
+```{r}
+max(abs(bc$fitted - fit$fitted))
+```
+
+What moves is the split. A more persistent `Phi` means today's rate level is
+expected to last, so the expectations component tracks the level instead of
+reverting to a sample average, and the term premium — its residual — becomes
+smaller in variance:
+
+```{r}
+j <- match(120L, fit$maturities)
+rbind(
+  ols = c(tp_mean = mean(fit$term_premium[, j]), tp_sd = sd(fit$term_premium[, j]),
+          rn_sd = sd(fit$risk_neutral[, j])),
+  brw = c(mean(bc$term_premium[, j]), sd(bc$term_premium[, j]),
+          sd(bc$risk_neutral[, j]))
+) * 1e4
+```
+
+That is BRW's substantive claim: a material share of what the uncorrected model
+calls term premium variation is an artefact of mean reversion estimated too
+fast.
+
+Note what this does to the benchmark comparison:
+
+```{r}
+cmp$brw_bp <- bc$term_premium[match(cmp$date, fit$dates), j] * 1e4
+c(corr_with_published   = cor(cmp$brw_bp, cmp$pub_bp),
+  corr_with_uncorrected = cor(cmp$brw_bp, cmp$mine_bp))
+```
+
+```{r, echo = FALSE}
+plot(cmp$date, cmp$mine_bp, type = "l", lwd = 1.4, col = "firebrick",
+     xlab = "", ylab = "basis points",
+     ylim = range(cmp$mine_bp, cmp$brw_bp),
+     main = "US 10-year term premium: effect of the bias correction")
+lines(cmp$date, cmp$brw_bp, lwd = 1.4, col = "steelblue")
+abline(h = 0, col = "grey85", lty = 2)
+legend("topright", c("OLS dynamics", "bias-corrected dynamics"),
+       col = c("firebrick", "steelblue"), lwd = 1.4, bty = "n", cex = 0.85)
+```
+
+The correlation with the New York Fed series falls sharply, and it should: the
+published series is uncorrected. Agreement with it is evidence about the
+*estimator*, which the previous sections established; it is not evidence about
+which specification is right. A bias-corrected model is a different, defensible
+answer to the same question, and the two disagree by considerably more than the
+15bp level gap investigated above.
+
+The correction is a bootstrap, so it costs a few seconds and is a Monte Carlo
+estimate; `brw_control()` fixes a seed by default so that repeated fits on the
+same data agree exactly.
+
 ## Can the short rate account for it?
 
 One input is a genuine modelling choice rather than a given. The short rate
@@ -235,6 +315,10 @@ the package reports it rather than hiding it. Shadow-rate models (Wu and Xia
 
 Adrian, T., R. K. Crump and E. Moench (2013). "Pricing the term structure with
 linear regressions." *Journal of Financial Economics* 110(1), 110–138.
+
+Bauer, M. D., G. D. Rudebusch and J. C. Wu (2012). "Correcting estimation bias
+in dynamic term structure models." *Journal of Business & Economic Statistics*
+30(3), 454–467.
 
 Cohen, B., P. Hördahl and D. Xia (2018). "Term premia: models and some stylised
 facts." *BIS Quarterly Review*, September.

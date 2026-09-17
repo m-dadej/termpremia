@@ -166,15 +166,30 @@ cat(sprintf("\nspectral radius: risk-adjusted %.4f, real-world %.4f\n",
             fit$spectral_radius[["risk_adjusted"]],
             fit$spectral_radius[["real_world"]]))
 
+# The same model with the small-sample bias in the factor VAR corrected. This
+# is the second series they publish, and the reason this script fits both: 261
+# monthly observations of a near-unit-root process is exactly the case the
+# correction exists for.
+fit_brw <- atsm(monthly, n_factors = N_FACTORS, maturities = MATURITIES,
+                p_dynamics = "brw")
+cat("\n")
+print(fit_brw)
+
 pred <- predict(fit, weekly)
 ours <- pred[pred$maturity == HORIZON, c("date", "term_premium")]
 
+pred_brw <- predict(fit_brw, weekly)
+ours_brw <- pred_brw[pred_brw$maturity == HORIZON, c("date", "term_premium")]
+names(ours_brw)[2] <- "term_premium_brw"
+
 # --- compare -------------------------------------------------------------
 
-cmp <- merge(ours, theirs[, c("date", "acm_bp", "brw_bp")], by = "date")
+cmp <- merge(merge(ours, ours_brw, by = "date"),
+             theirs[, c("date", "acm_bp", "brw_bp")], by = "date")
 cmp <- cmp[complete.cases(cmp), ]          # their series has one missing row
 cmp <- cmp[order(cmp$date), ]
 cmp$ours_bp <- cmp$term_premium * 1e4      # decimals -> basis points
+cmp$ours_brw_bp <- cmp$term_premium_brw * 1e4
 
 report <- function(label, mine, theirs_bp) {
   cat(sprintf(
@@ -185,8 +200,12 @@ report <- function(label, mine, theirs_bp) {
 }
 
 cat(sprintf("\n=== 10y term premium, %d weekly observations ===\n", nrow(cmp)))
+cat("-- our OLS estimate --\n")
 report("vs their ACM", cmp$ours_bp, cmp$acm_bp)
 report("vs their BRW", cmp$ours_bp, cmp$brw_bp)
+cat("-- our bias-corrected estimate --\n")
+report("vs their ACM", cmp$ours_brw_bp, cmp$acm_bp)
+report("vs their BRW", cmp$ours_brw_bp, cmp$brw_bp)
 
 cat("\nLevels and changes are reported separately on purpose. Implementations\n")
 cat("of the same model routinely agree closely on direction while differing\n")
@@ -200,15 +219,25 @@ if (MAKE_PLOT) {
   op <- par(mfrow = c(2, 1), mar = c(3, 4, 2, 1))
 
   plot(cmp$date, cmp$acm_bp, type = "l", lwd = 2, col = "grey40",
-       xlab = "", ylab = "bp", main = "Polish 10y term premium")
+       xlab = "", ylab = "bp", main = "Polish 10y term premium",
+       ylim = range(cmp$acm_bp, cmp$brw_bp, cmp$ours_bp, cmp$ours_brw_bp))
+  lines(cmp$date, cmp$brw_bp, lwd = 2, col = "grey70")
   lines(cmp$date, cmp$ours_bp, lwd = 1.5, col = "firebrick")
+  lines(cmp$date, cmp$ours_brw_bp, lwd = 1.5, col = "steelblue")
   abline(h = 0, col = "grey80", lty = 2)
-  legend("topleft", c("yieldcartography ACM", "termpremia"),
-         col = c("grey40", "firebrick"), lwd = c(2, 1.5), bty = "n", cex = 0.8)
+  legend("topleft",
+         c("yieldcartography ACM", "yieldcartography BRW",
+           "termpremia OLS", "termpremia BRW"),
+         col = c("grey40", "grey70", "firebrick", "steelblue"),
+         lwd = c(2, 2, 1.5, 1.5), bty = "n", cex = 0.8)
 
-  plot(cmp$date, cmp$ours_bp - cmp$acm_bp, type = "l", col = "steelblue",
-       xlab = "", ylab = "bp", main = "Difference (ours - theirs)")
-  abline(h = mean(cmp$ours_bp - cmp$acm_bp), col = "firebrick", lty = 2)
+  plot(cmp$date, cmp$ours_bp - cmp$acm_bp, type = "l", col = "firebrick",
+       xlab = "", ylab = "bp", main = "Difference (ours - theirs)",
+       ylim = range(cmp$ours_bp - cmp$acm_bp, cmp$ours_brw_bp - cmp$brw_bp))
+  lines(cmp$date, cmp$ours_brw_bp - cmp$brw_bp, col = "steelblue")
+  abline(h = 0, col = "grey80", lty = 2)
+  legend("topleft", c("OLS vs their ACM", "BRW vs their BRW"),
+         col = c("firebrick", "steelblue"), lwd = 1, bty = "n", cex = 0.8)
 
   par(op)
 }

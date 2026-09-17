@@ -11,7 +11,8 @@ atsm(
   curve = NULL,
   maturities = NULL,
   return_maturities = NULL,
-  p_dynamics = c("ols"),
+  p_dynamics = c("ols", "brw"),
+  brw_control = termpremia::brw_control(),
   short_rate = NULL,
   short_rate_units = c("auto", "percent", "decimal")
 )
@@ -34,8 +35,12 @@ Defaults to every maturity on the panel's grid.}
 formed. Each requires its predecessor on the grid. Defaults to every
 maturity from 2 upwards.}
 
-\item{p_dynamics}{Estimator for the real-world factor dynamics. Currently
-only \code{"ols"}.}
+\item{p_dynamics}{Estimator for the real-world factor dynamics. \code{"ols"} is
+ACM's own least squares VAR. \code{"brw"} applies the Bauer, Rudebusch and Wu
+(2012) small-sample bias correction to it; see the section below.}
+
+\item{brw_control}{Settings for the bias correction, from \code{\link[=brw_control]{brw_control()}}.
+Ignored unless \code{p_dynamics = "brw"}.}
 
 \item{short_rate}{Optional external one-period short rate, as a data frame
 with \code{date} and \code{value} covering every panel date. Defaults to the panel's
@@ -80,6 +85,31 @@ in rates as evidence that the steady state itself has moved, exaggerating
 distant-horizon expectations. Survey-augmented dynamics are the usual remedy.
 }
 
+\section{Small-sample bias in the factor dynamics}{
+
+The persistence of an autoregression is estimated downwards in finite
+samples. Yield factors are close to a unit root and term structure samples
+are short, so the bias is material: a \code{Phi} that reverts too fast sends
+expected future short rates to their unconditional mean too quickly, which
+flattens the expectations component of a long yield and pushes the variation
+it should have carried into the term premium instead. Bauer, Rudebusch and
+Wu (2012) show this accounts for a large share of the movement usually
+attributed to term premia, and that correcting it leaves the fit to the
+yield curve untouched.
+
+\code{p_dynamics = "brw"} applies their bootstrap correction. Expect a more
+persistent \code{Phi}, a more variable expectations component, and a term premium
+that is smaller and smoother than the OLS one. It is worth reaching for
+whenever the sample is short relative to the persistence of the data --
+twenty years of monthly observations is short for this purpose -- and it is
+what published estimates for shorter-history markets generally use.
+
+The correction is a bootstrap, so it is not free: the default 1000
+replications take a few seconds on a sixty-year monthly panel. It is also
+Monte Carlo, so \code{\link[=brw_control]{brw_control()}} fixes a seed by default to keep results
+reproducible.
+}
+
 \examples{
 panel <- yield_panel(gsw_monthly, units = "percent",
                      maturity_unit = "months", issuer = "US")
@@ -89,11 +119,25 @@ fit
 tp <- term_premium(fit, maturity = 120)
 tail(tp)
 
+\donttest{
+# Bias-corrected factor dynamics. The yield curve fit is unchanged; the
+# split between expectations and term premium is not.
+bc <- atsm(panel, n_factors = 5, p_dynamics = "brw")
+bc
+}
+
 }
 \references{
 Adrian, T., R. K. Crump and E. Moench (2013). "Pricing the term structure
 with linear regressions." \emph{Journal of Financial Economics} 110(1), 110-138.
 
+Bauer, M. D., G. D. Rudebusch and J. C. Wu (2012). "Correcting estimation
+bias in dynamic term structure models." \emph{Journal of Business & Economic
+Statistics} 30(3), 454-467.
+
 Cohen, B., P. Hordahl and D. Xia (2018). "Term premia: models and some
 stylised facts." \emph{BIS Quarterly Review}, September.
+}
+\seealso{
+\code{\link[=brw_control]{brw_control()}} for the bias correction settings.
 }

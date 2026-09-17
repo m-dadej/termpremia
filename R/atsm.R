@@ -26,6 +26,29 @@
 #' in rates as evidence that the steady state itself has moved, exaggerating
 #' distant-horizon expectations. Survey-augmented dynamics are the usual remedy.
 #'
+#' @section Small-sample bias in the factor dynamics:
+#' The persistence of an autoregression is estimated downwards in finite
+#' samples. Yield factors are close to a unit root and term structure samples
+#' are short, so the bias is material: a `Phi` that reverts too fast sends
+#' expected future short rates to their unconditional mean too quickly, which
+#' flattens the expectations component of a long yield and pushes the variation
+#' it should have carried into the term premium instead. Bauer, Rudebusch and
+#' Wu (2012) show this accounts for a large share of the movement usually
+#' attributed to term premia, and that correcting it leaves the fit to the
+#' yield curve untouched.
+#'
+#' `p_dynamics = "brw"` applies their bootstrap correction. Expect a more
+#' persistent `Phi`, a more variable expectations component, and a term premium
+#' that is smaller and smoother than the OLS one. It is worth reaching for
+#' whenever the sample is short relative to the persistence of the data --
+#' twenty years of monthly observations is short for this purpose -- and it is
+#' what published estimates for shorter-history markets generally use.
+#'
+#' The correction is a bootstrap, so it is not free: the default 1000
+#' replications take a few seconds on a sixty-year monthly panel. It is also
+#' Monte Carlo, so [brw_control()] fixes a seed by default to keep results
+#' reproducible.
+#'
 #' @param panel A [yield_panel].
 #' @param pricing Pricing model. Currently only `"acm"`, the three-step
 #'   regression estimator of Adrian, Crump and Moench (2013).
@@ -37,8 +60,11 @@
 #' @param return_maturities Maturities, in months, for which excess returns are
 #'   formed. Each requires its predecessor on the grid. Defaults to every
 #'   maturity from 2 upwards.
-#' @param p_dynamics Estimator for the real-world factor dynamics. Currently
-#'   only `"ols"`.
+#' @param p_dynamics Estimator for the real-world factor dynamics. `"ols"` is
+#'   ACM's own least squares VAR. `"brw"` applies the Bauer, Rudebusch and Wu
+#'   (2012) small-sample bias correction to it; see the section below.
+#' @param brw_control Settings for the bias correction, from [brw_control()].
+#'   Ignored unless `p_dynamics = "brw"`.
 #' @param short_rate Optional external one-period short rate, as a data frame
 #'   with `date` and `value` covering every panel date. Defaults to the panel's
 #'   own one-month yield. Worth overriding when the curve was fitted without
@@ -53,8 +79,14 @@
 #' Adrian, T., R. K. Crump and E. Moench (2013). "Pricing the term structure
 #' with linear regressions." *Journal of Financial Economics* 110(1), 110-138.
 #'
+#' Bauer, M. D., G. D. Rudebusch and J. C. Wu (2012). "Correcting estimation
+#' bias in dynamic term structure models." *Journal of Business & Economic
+#' Statistics* 30(3), 454-467.
+#'
 #' Cohen, B., P. Hordahl and D. Xia (2018). "Term premia: models and some
 #' stylised facts." *BIS Quarterly Review*, September.
+#'
+#' @seealso [brw_control()] for the bias correction settings.
 #'
 #' @examples
 #' panel <- yield_panel(gsw_monthly, units = "percent",
@@ -65,6 +97,13 @@
 #' tp <- term_premium(fit, maturity = 120)
 #' tail(tp)
 #'
+#' \donttest{
+#' # Bias-corrected factor dynamics. The yield curve fit is unchanged; the
+#' # split between expectations and term premium is not.
+#' bc <- atsm(panel, n_factors = 5, p_dynamics = "brw")
+#' bc
+#' }
+#'
 #' @export
 atsm <- function(panel,
                  pricing = c("acm"),
@@ -72,7 +111,8 @@ atsm <- function(panel,
                  curve = NULL,
                  maturities = NULL,
                  return_maturities = NULL,
-                 p_dynamics = c("ols"),
+                 p_dynamics = c("ols", "brw"),
+                 brw_control = termpremia::brw_control(),
                  short_rate = NULL,
                  short_rate_units = c("auto", "percent", "decimal")) {
   pricing <- match.arg(pricing)
@@ -129,6 +169,17 @@ atsm <- function(panel,
 
   pars <- acm_three_step(x, rx, r)
 
+  # Step 1 is the only pluggable part of the estimator: the pricing recursion
+  # that follows does not care how the P-dynamics were arrived at. The bias
+  # correction therefore lands here, between estimation and pricing, and leaves
+  # the risk-adjusted dynamics exactly where the cross-section put them.
+  brw <- NULL
+  if (p_dynamics == "brw") {
+    corrected <- acm_brw_correct(pars, x, brw_control)
+    pars <- corrected$pars
+    brw <- corrected$diagnostics
+  }
+
   # The pricing recursion iterates up to n_max times. Unstable risk-adjusted
   # dynamics make it diverge geometrically and silently -- a sparse set of
   # return maturities can produce yields of order 1e267 with no error raised.
@@ -177,6 +228,7 @@ atsm <- function(panel,
       factors = x,
       pca = fac,
       pars = pars,
+      brw = brw,
       recursion = list(p = rec_p, q = rec_q),
       spectral_radius = c(risk_adjusted = rho_q, real_world = rho_p),
       zlb = zlb,
@@ -430,6 +482,19 @@ print.atsm_fit <- function(x, ...) {
   tp <- x$term_premium[, match(long, x$maturities)] * 1e4
   cat("  ", long %/% 12, "y term premium: mean ", sprintf("%.0f bp", mean(tp)),
       ", last ", sprintf("%.0f bp", tp[length(tp)]), "\n", sep = "")
+
+  if (!is.null(x$brw)) {
+    rho <- x$brw$spectral_radius
+    cat("  bias corr. : persistence ", sprintf("%.4f", rho[["ols"]]), " -> ",
+        sprintf("%.4f", rho[["corrected"]]),
+        " (half-life ", half_life_label(rho[["ols"]]), " -> ",
+        half_life_label(rho[["corrected"]]), ")\n", sep = "")
+    if (x$brw$shrinkage < 1) {
+      cat("               only ", sprintf("%.0f%%", 100 * x$brw$shrinkage),
+          " of the correction applied; the rest would have made the factor ",
+          "VAR explosive\n", sep = "")
+    }
+  }
 
   if (x$zlb$frac_negative > 0) {
     cat("  note       : expected short rates are negative in ",

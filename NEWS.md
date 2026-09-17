@@ -19,6 +19,15 @@ change before the first CRAN submission. Pin a commit if you build on it.
 * `short_rate` argument accepts an external one-period rate. This matters more
   than it sounds: substituting an actual bill rate for the GSW fitted one-month
   yield moves the estimated 10-year US term premium by about 27bp.
+* `p_dynamics = "brw"` applies the Bauer, Rudebusch & Wu (2012) small-sample
+  bias correction to the factor VAR, configured with `brw_control()`. Least
+  squares understates the persistence of near-unit-root factors, which flattens
+  the expectations component and pushes the variation it should have carried
+  into the term premium instead. The correction holds the risk-adjusted
+  dynamics fixed, so fitted yields are unchanged to machine precision and only
+  the decomposition moves: on US data it takes the factor half-life from 6.5
+  years to effectively permanent, and cuts the standard deviation of the
+  10-year term premium from 139bp to 120bp.
 
 ## Data handling
 

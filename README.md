@@ -34,6 +34,16 @@ term_premium(fit, maturity = 120)   # 10-year term premium
 plot(fit)                           # yield, expected short rate, premium
 ```
 
+Least squares understates how persistent yield factors are, which flattens the
+expectations component and inflates the term premium — badly so on short
+samples. `p_dynamics = "brw"` applies the Bauer, Rudebusch & Wu (2012)
+bootstrap correction, which leaves the fit to the yield curve untouched and
+changes only the split:
+
+```r
+atsm(panel, n_factors = 5, p_dynamics = "brw")
+```
+
 Bring your own curve — the package is curve-agnostic and takes any zero-coupon
 panel, in long or wide form:
 
@@ -72,15 +82,15 @@ short rate. A validation that reports only the agreement is marketing.
 here is to get feedback while changes are still cheap. If you build something
 on it, pin a commit. Breaking changes will be noted in `NEWS.md`.
 
-In scope: ACM estimation; term premia by tenor, risk-neutral yields, expected
-short-rate paths, expected excess returns; multiple curves; a model-free survey
-benchmark.
+In scope: ACM estimation; Bauer-Rudebusch-Wu bias correction; term premia by
+tenor, risk-neutral yields, expected short-rate paths, expected excess returns;
+multiple curves; a model-free survey benchmark.
 
 Not in scope: fitting curves from bond prices, shadow-rate models, joint
 multi-country (GVAR) estimation, credit, derivatives.
 
-On the roadmap: Bauer-Rudebusch-Wu bias correction, survey-augmented dynamics,
-and the joint real-nominal decomposition.
+On the roadmap: survey-augmented dynamics and the joint real-nominal
+decomposition.
 
 ## Licence and bundled data
 
@@ -102,6 +112,9 @@ assert no copyright.
 
 - Adrian, T., R. K. Crump & E. Moench (2013). "Pricing the term structure with
   linear regressions." *Journal of Financial Economics* 110(1), 110–138.
+- Bauer, M. D., G. D. Rudebusch & J. C. Wu (2012). "Correcting estimation bias
+  in dynamic term structure models." *Journal of Business & Economic
+  Statistics* 30(3), 454–467.
 - Cohen, B., P. Hördahl & D. Xia (2018). "Term premia: models and some stylised
   facts." *BIS Quarterly Review*, September.
 - Gürkaynak, R. S., B. Sack & J. H. Wright (2007). "The U.S. Treasury yield
