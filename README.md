@@ -1,66 +1,144 @@
 # termpremia
 
-Decompose zero-coupon government bond yields into expected average future short rates
-and a term premium:
+Decompose zero-coupon government bond yields into expected average future short
+rates and a term premium, using the Adrian, Crump & Moench (2013) three-step
+regression estimator.
 
 ```
 yield(n) = expected average future short rate(n) + term premium(n)
 ```
 
-**Status: early development. Not yet usable.**
+**Status: working, validated, API not yet stable.** See
+[Stability](#stability-and-scope) before building on it.
 
-## Why this package
+## Installation
 
-R can fit Nelson–Siegel and Svensson curves (`YieldCurve`, `yieldcurves`), but curve
-fitting is interpolation, not no-arbitrage pricing — it never produces a term premium.
-`MultiATSM` estimates affine models by maximum likelihood and does report term premia,
-risk-neutral yields and expected short rates, but it targets multi-country
-unspanned-macro-risk research and its interface is built around matrices and Excel input.
+```r
+# install.packages("remotes")
+remotes::install_github("m-dadej/termpremia", build_vignettes = TRUE)
+```
 
-`termpremia` fills a narrower gap:
+No compiled code and no hard dependencies beyond base R, so it installs
+anywhere without a toolchain.
 
-- **ACM three-step regressions** (Adrian, Crump & Moench 2013) — closed-form OLS, so
-  estimation is fast, deterministic, and cannot fail to converge. Not currently
-  available in R.
+## Quick start
+
+```r
+library(termpremia)
+
+panel <- yield_panel(gsw_monthly, units = "percent", maturity_unit = "months",
+                     instrument = "government", issuer = "US")
+
+fit <- atsm(panel, n_factors = 5)
+
+term_premium(fit, maturity = 120)   # 10-year term premium
+plot(fit)                           # yield, expected short rate, premium
+```
+
+Bring your own curve — the package is curve-agnostic and takes any zero-coupon
+panel, in long or wide form:
+
+```r
+my_panel <- yield_panel(my_data, date = "date", maturity = "tenor",
+                        yield = "zero_rate", units = "percent",
+                        maturity_unit = "years", issuer = "DE")
+```
+
+If you hold Nelson-Siegel or Svensson parameters rather than yields (as
+published by the Fed, Bundesbank, and others), `svensson_curve()` evaluates
+them onto whatever maturity grid you need.
+
+## Does it work?
+
+Against the New York Fed's published ACM series, 763 month-ends, 1961–2024:
+
+| | |
+|---|---|
+| Correlation, levels | **0.9997** |
+| Correlation, monthly changes | **0.9935** |
+| Fit to the observed curve | **1.48 bp** RMSE |
+| `fitted = risk_neutral + term_premium` | exact to 7e-18 |
+
+For scale, the BIS report change correlations of 0.77–0.92 between published
+implementations of *different* term structure models.
+
+`vignette("validation")` reproduces this and then investigates the part that
+does **not** match: a residual ~15bp level difference, which the vignette
+localises entirely to the risk-neutral component and traces to the choice of
+short rate. A validation that reports only the agreement is marketing.
+
+## Why another term structure package
+
+`YieldCurve` and `yieldcurves` fit Nelson-Siegel/Svensson curves — that is
+interpolation, not no-arbitrage pricing, and it never produces a term premium.
+`MultiATSM` does estimate affine models and report term premia, by maximum
+likelihood, aimed at multi-country unspanned-macro-risk research.
+
+This package is narrower and complementary:
+
+- **ACM three-step regressions** — closed-form OLS, so estimation is fast,
+  deterministic, and cannot fail to converge. Not otherwise available in R.
 - **A desk-usable API** — hand it a curve, get a term premium.
-- **Validated against the New York Fed's published ACM series.**
+- **Validated against published numbers**, with the residual gap documented
+  rather than hidden.
 
-## Scope
+## A caution about levels
 
-One question: given a zero-coupon curve, what is the no-arbitrage decomposition of yields?
+Term premium models disagree, and not by a little. Cohen, Hördahl & Xia (BIS
+Quarterly Review, September 2018) find gaps of up to **200 basis points**
+between published estimates for the same market and date, while agreeing
+closely on direction. The BIS themselves plot an average across models rather
+than trusting any single level.
 
-**In scope.** ACM three-step regressions; term premia by tenor, risk-neutral yields,
-expected short-rate paths, expected excess returns; a model-free survey benchmark;
-pluggable real-world dynamics (OLS, survey-augmented); joint real–nominal decomposition
-yielding inflation risk premia and model-implied expected inflation.
+Treat a single model's *level* with scepticism. This package reports level
+agreement and change agreement separately for that reason, and
+`term_premium_survey()` provides a model-free anchor.
 
-**Out of scope.** Fitting curves from bond prices, shadow-rate models, multi-country
-GVAR estimation, credit, derivatives.
+Two further limitations the package reports rather than conceals:
 
-The package is curve-agnostic: it accepts any zero-coupon curve, and never requires a
-particular data vendor.
+- **No lower bound.** Gaussian affine models can project expected short rates
+  arbitrarily below zero. Fitted on US data spanning the ZLB, this one reaches
+  −3.15%, a rate US policy never delivered. `atsm()` warns.
+- **Explosive dynamics.** A sparse cross-section can make the pricing recursion
+  diverge silently. `atsm()` checks the spectral radius and warns.
 
-## A caution on levels
+## Stability and scope
 
-Term premium models disagree, and the disagreement is not small. Cohen, Hördahl & Xia
-(*BIS Quarterly Review*, September 2018) find that ACM and Hördahl–Tristani estimates
-can differ by as much as 200bp in level while agreeing closely on direction — monthly
-change correlations of 0.77–0.92 for the US.
+**The API may change before the first CRAN release.** The point of publishing
+here is to get feedback while changes are still cheap. If you build something
+on it, pin a commit. Breaking changes will be noted in `NEWS.md`.
 
-Treat any single model's *level* with scepticism. This package reports level agreement
-and change agreement separately for that reason, and provides a model-free survey
-benchmark as an independent anchor.
+In scope: ACM estimation; term premia by tenor, risk-neutral yields, expected
+short-rate paths, expected excess returns; multiple curves; a model-free survey
+benchmark.
+
+Not in scope: fitting curves from bond prices, shadow-rate models, joint
+multi-country (GVAR) estimation, credit, derivatives.
+
+On the roadmap: Bauer-Rudebusch-Wu bias correction, survey-augmented dynamics,
+and the joint real-nominal decomposition.
+
+## Licence and bundled data
+
+The package is MIT licensed. **The bundled datasets are not.** Each is governed
+by its own source's terms, recorded in
+[`LICENSE.note`](LICENSE.note) — read it before redistributing.
+
+In particular, `acm_published` is redistributed under the New York Fed's Terms
+of Use, which require attribution, clear labelling of modifications, and that
+**the same permissions pass to anyone you pass the data to**:
+
+> © Federal Reserve Bank of New York. Content from the New York Fed subject to
+> the Terms of Use at newyorkfed.org.
+
+`gsw_monthly` and `tbill_3m` derive from Federal Reserve Board releases, which
+assert no copyright.
 
 ## References
 
-- Adrian, T., R. Crump and E. Moench (2013). "Pricing the term structure with linear
-  regressions." *Journal of Financial Economics* 110(1), 110–138.
-- Abrahams, M., T. Adrian, R. Crump, E. Moench and R. Yu (2016). "Decomposing real and
-  nominal yield curves." *Journal of Monetary Economics*.
-- Cohen, B., P. Hördahl and D. Xia (2018). "Term premia: models and some stylised facts."
-  *BIS Quarterly Review*, September.
-
-## Licence
-
-MIT. Any third-party data distributed with the package is governed by its own source's
-terms rather than by this licence; those terms are recorded alongside the data.
+- Adrian, T., R. K. Crump & E. Moench (2013). "Pricing the term structure with
+  linear regressions." *Journal of Financial Economics* 110(1), 110–138.
+- Cohen, B., P. Hördahl & D. Xia (2018). "Term premia: models and some stylised
+  facts." *BIS Quarterly Review*, September.
+- Gürkaynak, R. S., B. Sack & J. H. Wright (2007). "The U.S. Treasury yield
+  curve: 1961 to the present." *Journal of Monetary Economics* 54(8), 2291–2304.
