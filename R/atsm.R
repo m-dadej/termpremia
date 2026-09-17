@@ -150,6 +150,8 @@ atsm <- function(panel,
   fitted_ann <- acm_yields(rec_p, x, maturities) * 12
   rn_ann <- acm_yields(rec_q, x, maturities) * 12
 
+  zlb <- zlb_check(rn_ann, maturities)
+
   structure(
     list(
       pricing = pricing,
@@ -166,6 +168,7 @@ atsm <- function(panel,
       pars = pars,
       recursion = list(p = rec_p, q = rec_q),
       spectral_radius = c(risk_adjusted = rho_q, real_world = rho_p),
+      zlb = zlb,
       observed = y_ann,
       fitted = fitted_ann,
       risk_neutral = rn_ann,
@@ -173,6 +176,57 @@ atsm <- function(panel,
       frequency = panel$frequency
     ),
     class = "atsm_fit"
+  )
+}
+
+
+#' Check model-implied expected short rates against the lower bound
+#'
+#' A Gaussian affine model has no lower bound: nothing stops it projecting
+#' expected short rates arbitrarily far below zero. Near the effective lower
+#' bound that is a real problem rather than a curiosity, because a model that
+#' cannot represent the bound will place probability on rates that policy will
+#' not deliver, and bias the resulting term premium.
+#'
+#' Mildly negative values are not automatically wrong -- Polish, euro area and
+#' Swiss policy rates were genuinely negative, and the Polish curve in this
+#' package contains negative fitted yields. The diagnostic therefore reports
+#' rather than forbids, and only warns when the breach is large enough that it
+#' cannot be an actual policy rate.
+#'
+#' @param rn Matrix of annualised risk-neutral yields (decimals).
+#' @param maturities Maturities in months.
+#' @param threshold Annualised decimal below which a value is treated as
+#'   implausible for a realised policy rate. Default -1%.
+#'
+#' @return A list with `min`, `frac_negative`, `frac_below_threshold` and
+#'   `worst_maturity`.
+#' @keywords internal
+#' @noRd
+zlb_check <- function(rn, maturities, threshold = -0.01) {
+  worst <- min(rn)
+  frac_neg <- mean(rn < 0)
+  frac_bad <- mean(rn < threshold)
+
+  if (worst < threshold) {
+    j <- which(apply(rn, 2L, min) < threshold)
+    warning(
+      "Model-implied expected short rates fall to ",
+      format(round(worst * 100, 2), nsmall = 2), "% at ",
+      maturities[j[1]], "-month maturity, below the ",
+      format(threshold * 100), "% plausibility threshold. Gaussian affine ",
+      "models impose no lower bound, so estimates near the effective lower ",
+      "bound may be unreliable. See Wu and Xia (2016) on shadow-rate models.",
+      call. = FALSE
+    )
+  }
+
+  list(
+    min = worst,
+    frac_negative = frac_neg,
+    frac_below_threshold = frac_bad,
+    threshold = threshold,
+    worst_maturity = maturities[which.min(apply(rn, 2L, min))]
   )
 }
 
@@ -325,6 +379,17 @@ print.atsm_fit <- function(x, ...) {
   tp <- x$term_premium[, match(long, x$maturities)] * 1e4
   cat("  ", long %/% 12, "y term premium: mean ", sprintf("%.0f bp", mean(tp)),
       ", last ", sprintf("%.0f bp", tp[length(tp)]), "\n", sep = "")
+
+  if (x$zlb$frac_negative > 0) {
+    cat("  note       : expected short rates are negative in ",
+        sprintf("%.1f%%", 100 * x$zlb$frac_negative),
+        " of cells (min ", sprintf("%.2f%%", 100 * x$zlb$min),
+        "); no lower bound is imposed\n", sep = "")
+  }
+  if (x$spectral_radius[["risk_adjusted"]] >= 1) {
+    cat("  warning    : risk-adjusted dynamics explosive (rho = ",
+        sprintf("%.4f", x$spectral_radius[["risk_adjusted"]]), ")\n", sep = "")
+  }
 
   invisible(x)
 }

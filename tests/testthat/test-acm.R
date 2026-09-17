@@ -6,7 +6,7 @@ us_panel <- function() {
 us_fit <- local({
   cache <- NULL
   function() {
-    if (is.null(cache)) cache <<- atsm(us_panel(), n_factors = 5)
+    if (is.null(cache)) cache <<- suppressWarnings(atsm(us_panel(), n_factors = 5))
     cache
   }
 })
