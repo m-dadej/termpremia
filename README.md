@@ -8,8 +8,7 @@ regression estimator.
 yield(n) = expected average future short rate(n) + term premium(n)
 ```
 
-**Status: working, validated, API not yet stable.** See
-[Stability](#stability-and-scope) before building on it.
+The package is working and validated but the API is not yet stable.
 
 ## Installation
 
@@ -48,7 +47,7 @@ If you hold Nelson-Siegel or Svensson parameters rather than yields (as
 published by the Fed, Bundesbank, and others), `svensson_curve()` evaluates
 them onto whatever maturity grid you need.
 
-## Does it work?
+## Reproducibility
 
 Against the New York Fed's published ACM series, 763 month-ends, 1961–2024:
 
@@ -66,41 +65,6 @@ implementations of *different* term structure models.
 does **not** match: a residual ~15bp level difference, which the vignette
 localises entirely to the risk-neutral component and traces to the choice of
 short rate. A validation that reports only the agreement is marketing.
-
-## Why another term structure package
-
-`YieldCurve` and `yieldcurves` fit Nelson-Siegel/Svensson curves — that is
-interpolation, not no-arbitrage pricing, and it never produces a term premium.
-`MultiATSM` does estimate affine models and report term premia, by maximum
-likelihood, aimed at multi-country unspanned-macro-risk research.
-
-This package is narrower and complementary:
-
-- **ACM three-step regressions** — closed-form OLS, so estimation is fast,
-  deterministic, and cannot fail to converge. Not otherwise available in R.
-- **A desk-usable API** — hand it a curve, get a term premium.
-- **Validated against published numbers**, with the residual gap documented
-  rather than hidden.
-
-## A caution about levels
-
-Term premium models disagree, and not by a little. Cohen, Hördahl & Xia (BIS
-Quarterly Review, September 2018) find gaps of up to **200 basis points**
-between published estimates for the same market and date, while agreeing
-closely on direction. The BIS themselves plot an average across models rather
-than trusting any single level.
-
-Treat a single model's *level* with scepticism. This package reports level
-agreement and change agreement separately for that reason, and
-`term_premium_survey()` provides a model-free anchor.
-
-Two further limitations the package reports rather than conceals:
-
-- **No lower bound.** Gaussian affine models can project expected short rates
-  arbitrarily below zero. Fitted on US data spanning the ZLB, this one reaches
-  −3.15%, a rate US policy never delivered. `atsm()` warns.
-- **Explosive dynamics.** A sparse cross-section can make the pricing recursion
-  diverge silently. `atsm()` checks the spectral radius and warns.
 
 ## Stability and scope
 
