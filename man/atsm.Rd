@@ -11,7 +11,9 @@ atsm(
   curve = NULL,
   maturities = NULL,
   return_maturities = NULL,
-  p_dynamics = c("ols")
+  p_dynamics = c("ols"),
+  short_rate = NULL,
+  short_rate_units = c("auto", "percent", "decimal")
 )
 }
 \arguments{
@@ -34,6 +36,15 @@ maturity from 2 upwards.}
 
 \item{p_dynamics}{Estimator for the real-world factor dynamics. Currently
 only \code{"ols"}.}
+
+\item{short_rate}{Optional external one-period short rate, as a data frame
+with \code{date} and \code{value} covering every panel date. Defaults to the panel's
+own one-month yield. Worth overriding when the curve was fitted without
+bills: Gurkaynak, Sack and Wright exclude bills and all securities under
+three months, so their fitted short end is extrapolated, and ACM's stated
+inputs include Federal Reserve H.15 rates.}
+
+\item{short_rate_units}{Units of \code{short_rate$value}.}
 }
 \value{
 An object of class \code{atsm_fit}.

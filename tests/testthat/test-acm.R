@@ -52,7 +52,7 @@ test_that("excess returns match their definition", {
   p <- -sweep(y, 2, mats, "*")
   colnames(p) <- mats
 
-  rx <- acm_excess_returns(p, mats, 2:5)
+  rx <- acm_excess_returns(p, mats, 2:5, r = -p[, 1])
 
   # rx[t+1]^(n-1) = p[t+1]^(n-1) - p[t]^(n) - r[t]
   expect_equal(unname(rx[1, 1]), unname(p[2, 1] - p[1, 2] - (-p[1, 1])))
@@ -63,7 +63,7 @@ test_that("excess returns match their definition", {
 test_that("excess returns need the predecessor maturity on the grid", {
   mats <- c(1, 12, 24)
   p <- matrix(-0.01, 10, 3, dimnames = list(NULL, mats))
-  expect_error(acm_excess_returns(p, mats, c(12, 24)), "both n and n-1")
+  expect_error(acm_excess_returns(p, mats, c(12, 24), r = -p[, 1]), "both n and n-1")
 })
 
 

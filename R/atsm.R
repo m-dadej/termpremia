@@ -39,6 +39,13 @@
 #'   maturity from 2 upwards.
 #' @param p_dynamics Estimator for the real-world factor dynamics. Currently
 #'   only `"ols"`.
+#' @param short_rate Optional external one-period short rate, as a data frame
+#'   with `date` and `value` covering every panel date. Defaults to the panel's
+#'   own one-month yield. Worth overriding when the curve was fitted without
+#'   bills: Gurkaynak, Sack and Wright exclude bills and all securities under
+#'   three months, so their fitted short end is extrapolated, and ACM's stated
+#'   inputs include Federal Reserve H.15 rates.
+#' @param short_rate_units Units of `short_rate$value`.
 #'
 #' @return An object of class `atsm_fit`.
 #'
@@ -65,9 +72,12 @@ atsm <- function(panel,
                  curve = NULL,
                  maturities = NULL,
                  return_maturities = NULL,
-                 p_dynamics = c("ols")) {
+                 p_dynamics = c("ols"),
+                 short_rate = NULL,
+                 short_rate_units = c("auto", "percent", "decimal")) {
   pricing <- match.arg(pricing)
   p_dynamics <- match.arg(p_dynamics)
+  short_rate_units <- match.arg(short_rate_units)
 
   if (!inherits(panel, "yield_panel")) {
     stop("`panel` must be a yield_panel; see ?yield_panel.", call. = FALSE)
@@ -113,8 +123,9 @@ atsm <- function(panel,
   x <- fac$scores
   rownames(x) <- rownames(y)
 
-  rx <- acm_excess_returns(p, maturities, return_maturities)
-  r <- y[, match(1L, maturities)]
+  r <- resolve_short_rate(short_rate, short_rate_units, panel$dates,
+                          y[, match(1L, maturities)])
+  rx <- acm_excess_returns(p, maturities, return_maturities, r)
 
   pars <- acm_three_step(x, rx, r)
 
@@ -179,6 +190,46 @@ atsm <- function(panel,
   )
 }
 
+
+#' Resolve the one-period short rate used by the estimator
+#'
+#' Defaults to the panel's own one-month yield. An external series can be
+#' supplied instead, which matters because a curve fitted without bills has an
+#' extrapolated short end: Gurkaynak, Sack and Wright exclude Treasury bills and
+#' every security with under three months to maturity, and caution against their
+#' own fitted short end. ACM's stated inputs include Federal Reserve H.15.
+#'
+#' @param short_rate `NULL`, or a data frame with `date` and `value`.
+#' @param units Units of `short_rate$value`.
+#' @param dates The panel's dates.
+#' @param default Fallback short rate, in monthly units.
+#' @return A vector of short rates in monthly units, aligned to `dates`.
+#' @keywords internal
+#' @noRd
+resolve_short_rate <- function(short_rate, units, dates, default) {
+  if (is.null(short_rate)) return(default)
+
+  if (!is.data.frame(short_rate) ||
+      !all(c("date", "value") %in% names(short_rate))) {
+    stop("`short_rate` must be a data frame with `date` and `value` columns.",
+         call. = FALSE)
+  }
+
+  sr_date <- as_date_strict(short_rate$date, arg = "short_rate$date")
+  sr_val <- as_yield_decimal(short_rate$value, units, arg = "short_rate$value")
+
+  idx <- match(dates, sr_date)
+  if (anyNA(idx)) {
+    stop(
+      "`short_rate` has no observation for ", sum(is.na(idx)), " of ",
+      length(dates), " panel dates (first: ",
+      format(dates[which(is.na(idx))[1]]), "). It must cover the panel exactly.",
+      call. = FALSE
+    )
+  }
+
+  sr_val[idx] / 12   # annualised decimal -> monthly units
+}
 
 #' Check model-implied expected short rates against the lower bound
 #'

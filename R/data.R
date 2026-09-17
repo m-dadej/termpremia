@@ -111,3 +111,45 @@
 #' tp10 <- acm_published[acm_published$maturity == 120, ]
 #' tail(tp10[, c("date", "term_premium")])
 "acm_published"
+
+
+#' Three-month US Treasury bill rate, month-end aligned, 1961-2024
+#'
+#' The 3-month Treasury bill secondary market rate, as an alternative short rate
+#' for [atsm()].
+#'
+#' @section Why an alternative short rate matters:
+#' Gurkaynak, Sack and Wright exclude Treasury bills, and every security with
+#' under three months to maturity, when fitting their curve. Their short end is
+#' therefore an extrapolation, and they caution against it. Measured against
+#' this series, the GSW fitted one-month yield sits about **28bp higher on
+#' average**, with a standard deviation of 127bp.
+#'
+#' That matters because the short rate enters excess returns directly as
+#' \eqn{-r_t}, so it moves the estimated prices of risk and hence the level of
+#' the term premium. Substituting this series for the fitted one-month yield
+#' shifts the estimated 10-year US term premium by roughly 27bp. See
+#' `vignette("validation")`.
+#'
+#' A caveat: this is a *three*-month rate standing in for the model's
+#' *one*-month period, which is internally inconsistent and degrades the fit to
+#' the curve. It is a diagnostic for bounding the short rate's influence, not a
+#' drop-in improvement.
+#'
+#' @format A data frame with 763 rows and 2 columns:
+#' \describe{
+#'   \item{date}{Month-end date, aligned to [gsw_monthly].}
+#'   \item{value}{Secondary market rate, monthly average, in percent.}
+#' }
+#'
+#' @source Federal Reserve Board H.15, distributed as FRED series `TB3MS`,
+#'   <https://fred.stlouisfed.org/series/TB3MS>. Built by `data-raw/tbill.R`.
+#'
+#' @examples
+#' panel <- yield_panel(gsw_monthly, units = "percent",
+#'                      maturity_unit = "months", issuer = "US")
+#'
+#' # The fitted short end runs well above actual bill rates
+#' fitted_1m <- gsw_monthly$yield[gsw_monthly$maturity == 1]
+#' mean(fitted_1m - tbill_3m$value)
+"tbill_3m"

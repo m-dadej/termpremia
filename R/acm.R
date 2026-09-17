@@ -71,12 +71,17 @@ acm_factors <- function(y, k) {
 #'   with `colnames` giving maturities in months.
 #' @param maturities Integer maturities, in months, matching `colnames(p)`.
 #' @param return_maturities Maturities `n` for which to form returns.
+#' @param r Length-`T` vector of one-period short rates in monthly units. Kept
+#'   as an argument rather than read off the one-month column because the short
+#'   rate is a modelling choice: ACM's own stated inputs include Federal Reserve
+#'   H.15 bill rates alongside the fitted curve, and a curve fitted without
+#'   bills (as GSW is) has an extrapolated, unreliable short end.
 #'
 #' @return A `(T-1) x length(return_maturities)` matrix of excess returns.
 #'
 #' @keywords internal
 #' @noRd
-acm_excess_returns <- function(p, maturities, return_maturities) {
+acm_excess_returns <- function(p, maturities, return_maturities, r) {
   idx_n <- match(return_maturities, maturities)
   idx_nm1 <- match(return_maturities - 1L, maturities)
 
@@ -90,12 +95,7 @@ acm_excess_returns <- function(p, maturities, return_maturities) {
   }
 
   tt <- nrow(p)
-  short_idx <- match(1L, maturities)
-  if (is.na(short_idx)) {
-    stop("The one-month maturity is required as the short rate but is absent ",
-         "from the grid.", call. = FALSE)
-  }
-  r <- -p[, short_idx]  # one-month yield in monthly units
+  stopifnot(length(r) == tt)
 
   rx <- p[-1L, idx_nm1, drop = FALSE] -
     p[-tt, idx_n, drop = FALSE] -

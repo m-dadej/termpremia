@@ -1,0 +1,247 @@
+---
+title: "Validating against the New York Fed ACM series"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Validating against the New York Fed ACM series}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 7,
+                      fig.height = 4.2, dpi = 120)
+options(digits = 4)
+```
+
+A term premium estimate is only as trustworthy as the evidence that the code
+producing it is correct. The Federal Reserve Bank of New York publishes the
+output of the Adrian, Crump and Moench (2013) model — fitted yields, the
+risk-neutral component and the term premium, monthly since 1961 — which makes
+an unusually strong benchmark available: not a stylised fact to be compared
+against loosely, but a specific series to be reproduced.
+
+This vignette reproduces it, then investigates what does not match and why.
+Both halves matter. A validation that reports only the agreement is marketing.
+
+```{r setup}
+library(termpremia)
+
+panel <- yield_panel(gsw_monthly, units = "percent",
+                     maturity_unit = "months",
+                     instrument = "government", issuer = "US")
+
+fit <- suppressWarnings(atsm(panel, n_factors = 5))
+fit
+```
+
+Five factors and a 1–120 month grid, matching the published specification. The
+`suppressWarnings()` is deliberate and is explained at the end — the model
+reports a real problem with itself.
+
+## The benchmark
+
+`acm_published` holds the New York Fed's own output. Its internal identity is
+worth checking first, because it is the identity our implementation must also
+satisfy:
+
+```{r}
+with(acm_published, max(abs(fitted - (risk_neutral + term_premium))))
+```
+
+Exact to machine precision. Ours is too, by construction:
+
+```{r}
+max(abs(fit$fitted - (fit$risk_neutral + fit$term_premium)))
+```
+
+## Headline comparison
+
+```{r}
+mine <- term_premium(fit, maturity = 120)
+pub <- acm_published[acm_published$maturity == 120, c("date", "term_premium")]
+
+cmp <- merge(mine, pub, by = "date")
+cmp$mine_bp <- cmp$value * 1e4
+cmp$pub_bp <- cmp$term_premium * 100
+
+c(observations = nrow(cmp),
+  corr_levels  = cor(cmp$mine_bp, cmp$pub_bp),
+  corr_changes = cor(diff(cmp$mine_bp), diff(cmp$pub_bp)),
+  mean_mine    = mean(cmp$mine_bp),
+  mean_published = mean(cmp$pub_bp))
+```
+
+Correlation of 0.9997 in levels and 0.9935 in monthly changes, across all 763
+month-ends. For scale, Cohen, Hördahl and Xia (2018) report change correlations
+of 0.77–0.92 between published implementations of *different* models.
+
+```{r, echo = FALSE}
+plot(cmp$date, cmp$pub_bp, type = "l", lwd = 2, col = "grey40",
+     xlab = "", ylab = "basis points",
+     main = "US 10-year term premium")
+lines(cmp$date, cmp$mine_bp, lwd = 1.4, col = "firebrick")
+abline(h = 0, col = "grey85", lty = 2)
+legend("topright", c("NY Fed published", "termpremia"),
+       col = c("grey40", "firebrick"), lwd = c(2, 1.4), bty = "n", cex = 0.85)
+```
+
+The model also fits the curve itself closely:
+
+```{r}
+sqrt(mean((fit$observed - fit$fitted)^2)) * 1e4  # RMSE, basis points
+```
+
+## Where the remaining difference lives
+
+The mean levels differ by about 15bp. Because the New York Fed publishes the
+*components*, not just the premium, that gap can be localised rather than
+guessed at.
+
+```{r}
+idx <- match(120, fit$maturities)
+pub10 <- acm_published[acm_published$maturity == 120, ]
+
+data.frame(
+  component = c("fitted yield", "risk-neutral", "term premium"),
+  mine = c(mean(fit$fitted[, idx]), mean(fit$risk_neutral[, idx]),
+           mean(fit$term_premium[, idx])) * 100,
+  published = c(mean(pub10$fitted), mean(pub10$risk_neutral),
+                mean(pub10$term_premium)),
+  mean_abs_diff_bp = c(
+    mean(abs(fit$fitted[, idx] * 100 - pub10$fitted)),
+    mean(abs(fit$risk_neutral[, idx] * 100 - pub10$risk_neutral)),
+    mean(abs(fit$term_premium[, idx] * 100 - pub10$term_premium))
+  ) * 100
+)
+```
+
+**The fitted yields agree to 0.77bp. The entire discrepancy is in the
+risk-neutral component.** We do not disagree about fitting the curve; we
+disagree about where to cut it.
+
+That localisation is structural, not incidental. Fitted yields depend on the
+risk-adjusted combination $(\mu - \lambda_0, \Phi - \lambda_1)$, while
+risk-neutral yields depend on $\mu$ and $\Phi$ alone. Agreeing on the former
+while differing on the latter means the real-world dynamics differ, with the
+prices of risk absorbing the difference.
+
+### Why the real-world dynamics are the fragile half
+
+The two halves of the model are identified by very different amounts of
+information. The pricing side is pinned by ~120 yields observed at *every*
+date. The real-world dynamics are pinned by the time series alone — and the
+factors are close to a unit root:
+
+```{r}
+rho <- fit$spectral_radius[["real_world"]]
+c(spectral_radius = rho,
+  half_life_months = log(0.5) / log(rho),
+  observations = length(fit$dates))
+```
+
+A shock with a 78-month half-life, observed over 763 months, gives roughly ten
+effective independent observations of the mean reversion. That parameter is
+barely estimated at all, and the risk-neutral yield is sensitive to it.
+
+## Can the short rate account for it?
+
+One input is a genuine modelling choice rather than a given. The short rate
+enters excess returns directly as $-r_t$, so it moves the estimated prices of
+risk and therefore the level of the premium.
+
+By default the package uses the panel's own one-month yield. But GSW exclude
+Treasury bills and all securities with under three months to maturity, so their
+short end is *extrapolated*, and they caution against it. ACM's own stated
+inputs include Federal Reserve H.15. The two disagree substantially:
+
+```{r}
+fitted_1m <- gsw_monthly$yield[gsw_monthly$maturity == 1]
+c(mean_gap_pp = mean(fitted_1m - tbill_3m$value),
+  sd_gap_pp = sd(fitted_1m - tbill_3m$value))
+```
+
+The fitted short end runs ~28bp above actual bill rates, with a large standard
+deviation. Substituting the bill series:
+
+```{r}
+fit_bill <- suppressWarnings(
+  atsm(panel, n_factors = 5, short_rate = tbill_3m, short_rate_units = "percent")
+)
+
+alt <- merge(term_premium(fit_bill, 120), pub, by = "date")
+
+data.frame(
+  short_rate = c("GSW fitted 1m", "3m Treasury bill", "NY Fed published"),
+  mean_tp_bp = c(mean(cmp$mine_bp), mean(alt$value) * 1e4, mean(cmp$pub_bp)),
+  curve_rmse_bp = c(sqrt(mean((fit$observed - fit$fitted)^2)),
+                    sqrt(mean((fit_bill$observed - fit_bill$fitted)^2)),
+                    NA) * 1e4
+)
+```
+
+**The two short-rate choices bracket the published series.** The fitted
+one-month yield puts the premium 15bp below; an actual bill rate puts it 12bp
+above. That is strong evidence the short rate is the lever, and it bounds the
+effect at roughly 27bp.
+
+It does not identify the answer. The bill series is a *three*-month rate
+standing in for the model's *one*-month period, which is internally
+inconsistent and degrades the curve fit by an order of magnitude (from 1.5bp to
+14bp RMSE). It is a diagnostic, not a recommended setting. Resolving this
+properly needs a genuine one-month rate over the full sample, which the free
+sources do not provide before 2001.
+
+## What this implementation does and does not establish
+
+Established:
+
+- The estimator reproduces the published series at 0.9997 in levels and 0.9935
+  in changes, and fits the curve to 1.5bp.
+- The decomposition identity holds exactly.
+- The residual gap lies entirely in the risk-neutral component, and the short
+  rate can move it by more than the gap itself.
+
+Not established:
+
+- Which specific choice the New York Fed made. Candidate explanations —
+  the short rate, factor scaling, sample conventions — are not separately
+  identified by the published output.
+
+Since ACM is fully deterministic, every basis point of difference is
+attributable to some concrete difference in inputs or conventions rather than to
+sampling noise. That makes the gap findable in principle; it is not findable
+from the published series alone.
+
+## A limitation the model reports about itself
+
+The `suppressWarnings()` at the top was hiding this:
+
+```{r}
+c(min_expected_short_rate_pct = fit$zlb$min * 100,
+  share_negative = fit$zlb$frac_negative)
+```
+
+Fitted over a sample spanning the zero lower bound, the model projects expected
+short rates to about −3%, a policy rate the United States has never delivered.
+Gaussian affine models impose no lower bound, and the BIS review flags exactly
+this: near the effective lower bound such models place probability on rates
+policy will not deliver, and the resulting term premium is biased.
+
+This is a property of the model class, not a defect in this implementation, and
+the package reports it rather than hiding it. Shadow-rate models (Wu and Xia
+2016) are the usual remedy and are not implemented here.
+
+## References
+
+Adrian, T., R. K. Crump and E. Moench (2013). "Pricing the term structure with
+linear regressions." *Journal of Financial Economics* 110(1), 110–138.
+
+Cohen, B., P. Hördahl and D. Xia (2018). "Term premia: models and some stylised
+facts." *BIS Quarterly Review*, September.
+
+Gürkaynak, R. S., B. Sack and J. H. Wright (2007). "The U.S. Treasury yield
+curve: 1961 to the present." *Journal of Monetary Economics* 54(8), 2291–2304.
+
+Wu, J. C. and F. D. Xia (2016). "Measuring the macroeconomic impact of monetary
+policy at the zero lower bound." *Journal of Money, Credit and Banking* 48(2–3),
+253–291.
