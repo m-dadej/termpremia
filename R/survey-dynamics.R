@@ -461,7 +461,12 @@ survey_fit_var <- function(x, mu0, phi0, sigma, delta0, delta1, targets,
     phi = out$phi,
     converged = fit$convergence == 0L,
     convergence = fit$convergence,
-    iterations = unname(fit$counts[["function"]]),
+    # `maxit` caps optim's ITERATIONS, which for BFGS is the gradient count,
+    # not the far larger function count. Reporting the function count here
+    # made the "raise `max_iter`" warning below unactionable, because the
+    # number shown was not the number being capped.
+    iterations = unname(fit$counts[["gradient"]]),
+    fn_evals = unname(fit$counts[["function"]]),
     objective = fit$value,
     objective_ols = objective(theta0),
     rmse_ols_bp = rmse(list(mu = mu0, phi = phi0)),
@@ -499,8 +504,9 @@ acm_survey_correct <- function(pars, x, survey, dates, control) {
   if (!fit$converged) {
     warning(
       "The survey-augmented VAR did not converge (optim code ",
-      fit$convergence, "). Raise `max_iter` in survey_control(), or loosen ",
-      "`reltol`. The reported dynamics are the best point reached.",
+      fit$convergence, ") after ", fit$iterations, " of at most ",
+      control$max_iter, " iterations. Raise `max_iter` in survey_control(), ",
+      "or loosen `reltol`. The reported dynamics are the best point reached.",
       call. = FALSE
     )
   }
