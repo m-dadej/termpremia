@@ -11,10 +11,15 @@ atsm(
   curve = NULL,
   maturities = NULL,
   return_maturities = NULL,
+<<<<<<< HEAD
   p_dynamics = c("ols", "brw", "survey"),
   brw_control = termpremia::brw_control(),
   survey = NULL,
   survey_control = termpremia::survey_control(),
+=======
+  p_dynamics = c("ols", "brw"),
+  brw_control = termpremia::brw_control(),
+>>>>>>> 2ec34793201fcb4b52491e543e62932d42cf2034
   short_rate = NULL,
   short_rate_units = c("auto", "percent", "decimal")
 )
@@ -39,6 +44,7 @@ maturity from 2 upwards.}
 
 \item{p_dynamics}{Estimator for the real-world factor dynamics. \code{"ols"} is
 ACM's own least squares VAR. \code{"brw"} applies the Bauer, Rudebusch and Wu
+<<<<<<< HEAD
 (2012) small-sample bias correction to it. \code{"survey"} disciplines it to
 match survey forecasts of the short rate. See the two sections below.}
 
@@ -53,6 +59,12 @@ forecast was made; \code{target_date}, the first month it refers to; and
 \item{survey_control}{Settings for the survey discipline, from
 \code{\link[=survey_control]{survey_control()}}, which is also where the tenor and averaging of the
 forecast are declared. Ignored unless \code{p_dynamics = "survey"}.}
+=======
+(2012) small-sample bias correction to it; see the section below.}
+
+\item{brw_control}{Settings for the bias correction, from \code{\link[=brw_control]{brw_control()}}.
+Ignored unless \code{p_dynamics = "brw"}.}
+>>>>>>> 2ec34793201fcb4b52491e543e62932d42cf2034
 
 \item{short_rate}{Optional external one-period short rate, as a data frame
 with \code{date} and \code{value} covering every panel date. Defaults to the panel's
@@ -122,6 +134,7 @@ Monte Carlo, so \code{\link[=brw_control]{brw_control()}} fixes a seed by defaul
 reproducible.
 }
 
+<<<<<<< HEAD
 \section{Anchoring the dynamics to surveys}{
 
 The caution above about ACM over-reacting to the level of rates is the other
@@ -150,6 +163,8 @@ rather than a sequence; \code{"brw"} targets the persistence of the dynamics and
 \code{"survey"} targets where they are heading.
 }
 
+=======
+>>>>>>> 2ec34793201fcb4b52491e543e62932d42cf2034
 \examples{
 panel <- yield_panel(gsw_monthly, units = "percent",
                      maturity_unit = "months", issuer = "US")
@@ -185,4 +200,7 @@ Analysis} 47(1), 241-272.
 \seealso{
 \code{\link[=brw_control]{brw_control()}} and \code{\link[=survey_control]{survey_control()}} for the settings of the two
 alternative P-dynamics, and \code{\link[=spf_tbill]{spf_tbill()}} for free survey data.
+}
+\seealso{
+\code{\link[=brw_control]{brw_control()}} for the bias correction settings.
 }
