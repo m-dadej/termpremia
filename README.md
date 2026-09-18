@@ -8,7 +8,7 @@ regression estimator.
 yield(n) = expected average future short rate(n) + term premium(n)
 ```
 
-The package is working and validated but the API is not yet stable.
+The package is working and validated, but the API is not yet stable.
 
 ## Installation
 
