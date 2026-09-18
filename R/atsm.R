@@ -49,7 +49,6 @@
 #' Monte Carlo, so [brw_control()] fixes a seed by default to keep results
 #' reproducible.
 #'
-<<<<<<< HEAD
 #' @section Anchoring the dynamics to surveys:
 #' The caution above about ACM over-reacting to the level of rates is the other
 #' half of the same problem, and bias correction does not address it. A model
@@ -76,8 +75,6 @@
 #' rather than a sequence; `"brw"` targets the persistence of the dynamics and
 #' `"survey"` targets where they are heading.
 #'
-=======
->>>>>>> 2ec34793201fcb4b52491e543e62932d42cf2034
 #' @param panel A [yield_panel].
 #' @param pricing Pricing model. Currently only `"acm"`, the three-step
 #'   regression estimator of Adrian, Crump and Moench (2013).
@@ -91,7 +88,6 @@
 #'   maturity from 2 upwards.
 #' @param p_dynamics Estimator for the real-world factor dynamics. `"ols"` is
 #'   ACM's own least squares VAR. `"brw"` applies the Bauer, Rudebusch and Wu
-<<<<<<< HEAD
 #'   (2012) small-sample bias correction to it. `"survey"` disciplines it to
 #'   match survey forecasts of the short rate. See the two sections below.
 #' @param brw_control Settings for the bias correction, from [brw_control()].
@@ -103,11 +99,6 @@
 #' @param survey_control Settings for the survey discipline, from
 #'   [survey_control()], which is also where the tenor and averaging of the
 #'   forecast are declared. Ignored unless `p_dynamics = "survey"`.
-=======
-#'   (2012) small-sample bias correction to it; see the section below.
-#' @param brw_control Settings for the bias correction, from [brw_control()].
-#'   Ignored unless `p_dynamics = "brw"`.
->>>>>>> 2ec34793201fcb4b52491e543e62932d42cf2034
 #' @param short_rate Optional external one-period short rate, as a data frame
 #'   with `date` and `value` covering every panel date. Defaults to the panel's
 #'   own one-month yield. Worth overriding when the curve was fitted without
@@ -129,16 +120,12 @@
 #' Cohen, B., P. Hordahl and D. Xia (2018). "Term premia: models and some
 #' stylised facts." *BIS Quarterly Review*, September.
 #'
-<<<<<<< HEAD
 #' Kim, D. H. and A. Orphanides (2012). "Term structure estimation with survey
 #' data on interest rate forecasts." *Journal of Financial and Quantitative
 #' Analysis* 47(1), 241-272.
 #'
 #' @seealso [brw_control()] and [survey_control()] for the settings of the two
 #'   alternative P-dynamics, and [spf_tbill()] for free survey data.
-=======
-#' @seealso [brw_control()] for the bias correction settings.
->>>>>>> 2ec34793201fcb4b52491e543e62932d42cf2034
 #'
 #' @examples
 #' panel <- yield_panel(gsw_monthly, units = "percent",
@@ -163,15 +150,10 @@ atsm <- function(panel,
                  curve = NULL,
                  maturities = NULL,
                  return_maturities = NULL,
-<<<<<<< HEAD
                  p_dynamics = c("ols", "brw", "survey"),
                  brw_control = termpremia::brw_control(),
                  survey = NULL,
                  survey_control = termpremia::survey_control(),
-=======
-                 p_dynamics = c("ols", "brw"),
-                 brw_control = termpremia::brw_control(),
->>>>>>> 2ec34793201fcb4b52491e543e62932d42cf2034
                  short_rate = NULL,
                  short_rate_units = c("auto", "percent", "decimal")) {
   pricing <- match.arg(pricing)
@@ -233,15 +215,11 @@ atsm <- function(panel,
   # correction therefore lands here, between estimation and pricing, and leaves
   # the risk-adjusted dynamics exactly where the cross-section put them.
   brw <- NULL
-<<<<<<< HEAD
   survey_fit <- NULL
-=======
->>>>>>> 2ec34793201fcb4b52491e543e62932d42cf2034
   if (p_dynamics == "brw") {
     corrected <- acm_brw_correct(pars, x, brw_control)
     pars <- corrected$pars
     brw <- corrected$diagnostics
-<<<<<<< HEAD
   } else if (p_dynamics == "survey") {
     if (is.null(survey)) {
       stop("`p_dynamics = \"survey\"` needs survey forecasts in `survey`. ",
@@ -255,8 +233,6 @@ atsm <- function(panel,
   } else if (!is.null(survey)) {
     warning("`survey` was supplied but `p_dynamics` is \"", p_dynamics,
             "\", so it was ignored.", call. = FALSE)
-=======
->>>>>>> 2ec34793201fcb4b52491e543e62932d42cf2034
   }
 
   # The pricing recursion iterates up to n_max times. Unstable risk-adjusted
@@ -308,10 +284,7 @@ atsm <- function(panel,
       pca = fac,
       pars = pars,
       brw = brw,
-<<<<<<< HEAD
       survey = survey_fit,
-=======
->>>>>>> 2ec34793201fcb4b52491e543e62932d42cf2034
       recursion = list(p = rec_p, q = rec_q),
       spectral_radius = c(risk_adjusted = rho_q, real_world = rho_p),
       zlb = zlb,
@@ -579,7 +552,6 @@ print.atsm_fit <- function(x, ...) {
     }
   }
 
-<<<<<<< HEAD
   if (!is.null(x$survey)) {
     s <- x$survey
     cat("  surveys    : ", s$n_forecasts, " forecasts, ",
@@ -591,8 +563,6 @@ print.atsm_fit <- function(x, ...) {
         sprintf("%.4f", s$spectral_radius[["survey"]]), "\n", sep = "")
   }
 
-=======
->>>>>>> 2ec34793201fcb4b52491e543e62932d42cf2034
   if (x$zlb$frac_negative > 0) {
     cat("  note       : expected short rates are negative in ",
         sprintf("%.1f%%", 100 * x$zlb$frac_negative),

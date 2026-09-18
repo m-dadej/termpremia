@@ -223,7 +223,6 @@ The correction is a bootstrap, so it costs a few seconds and is a Monte Carlo
 estimate; `brw_control()` fixes a seed by default so that repeated fits on the
 same data agree exactly.
 
-<<<<<<< HEAD
 ## What bias correction does not fix
 
 Persistence is one problem with the estimated dynamics. The other is that ACM
@@ -279,8 +278,6 @@ forecasts, which are proprietary. Exact replication of Kim–Wright is therefore
 not possible with free data, and this should be described as Kim–Wright *style*
 and never as a replication of it.
 
-=======
->>>>>>> 2ec34793201fcb4b52491e543e62932d42cf2034
 ## Can the short rate account for it?
 
 One input is a genuine modelling choice rather than a given. The short rate

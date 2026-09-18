@@ -28,7 +28,6 @@ change before the first CRAN submission. Pin a commit if you build on it.
   the decomposition moves: on US data it takes the factor half-life from 6.5
   years to effectively permanent, and cuts the standard deviation of the
   10-year term premium from 139bp to 120bp.
-<<<<<<< HEAD
 * `p_dynamics = "survey"` fits the factor VAR to reproduce published forecasts
   of the short rate as well as its own residuals, configured with
   `survey_control()`. This is the documented remedy for ACM reading every
@@ -43,8 +42,6 @@ change before the first CRAN submission. Pin a commit if you build on it.
   more persistent; the 35 ten-year observations in `BILL10` do more for the
   endpoint than the 700 quarterly ones. Together they take the standard
   deviation of the expected short rate ten years out from 100bp to 77bp.
-=======
->>>>>>> 2ec34793201fcb4b52491e543e62932d42cf2034
 
 ## Data handling
 
