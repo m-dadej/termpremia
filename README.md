@@ -44,6 +44,19 @@ changes only the split:
 atsm(panel, n_factors = 5, p_dynamics = "brw")
 ```
 
+A model that sees only yields also has no way to know where rates settle, so it
+reads every persistent move as a shift in the steady state. `p_dynamics =
+"survey"` anchors the dynamics to published forecasts instead —
+Kim–Wright style, not a replication of Kim–Wright:
+
+```r
+surveys <- rbind(spf_tbill(), spf_bill10())   # downloaded, not bundled
+atsm(panel, n_factors = 5, p_dynamics = "survey", survey = surveys)
+```
+
+Use both horizons. Short-horizon forecasts alone make the far end *worse*; see
+[`analysis/validate-spf.R`](analysis/validate-spf.R).
+
 Bring your own curve — the package is curve-agnostic and takes any zero-coupon
 panel, in long or wide form:
 
@@ -82,15 +95,15 @@ short rate. A validation that reports only the agreement is marketing.
 here is to get feedback while changes are still cheap. If you build something
 on it, pin a commit. Breaking changes will be noted in `NEWS.md`.
 
-In scope: ACM estimation; Bauer-Rudebusch-Wu bias correction; term premia by
-tenor, risk-neutral yields, expected short-rate paths, expected excess returns;
-multiple curves; a model-free survey benchmark.
+In scope: ACM estimation; Bauer-Rudebusch-Wu bias correction; survey-augmented
+dynamics; term premia by tenor, risk-neutral yields, expected short-rate paths,
+expected excess returns; multiple curves; a model-free survey benchmark.
 
 Not in scope: fitting curves from bond prices, shadow-rate models, joint
 multi-country (GVAR) estimation, credit, derivatives.
 
-On the roadmap: survey-augmented dynamics and the joint real-nominal
-decomposition.
+On the roadmap: the joint real-nominal decomposition, model comparison
+diagnostics, and expanding-window re-estimation.
 
 ## Licence and bundled data
 
@@ -115,6 +128,9 @@ assert no copyright.
 - Bauer, M. D., G. D. Rudebusch & J. C. Wu (2012). "Correcting estimation bias
   in dynamic term structure models." *Journal of Business & Economic
   Statistics* 30(3), 454–467.
+- Kim, D. H. & A. Orphanides (2012). "Term structure estimation with survey
+  data on interest rate forecasts." *Journal of Financial and Quantitative
+  Analysis* 47(1), 241–272.
 - Cohen, B., P. Hördahl & D. Xia (2018). "Term premia: models and some stylised
   facts." *BIS Quarterly Review*, September.
 - Gürkaynak, R. S., B. Sack & J. H. Wright (2007). "The U.S. Treasury yield

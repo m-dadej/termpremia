@@ -374,22 +374,11 @@ brw_bias_correct <- function(x, mu, phi, resid, control) {
 #' Apply the BRW correction to a fitted set of ACM parameters
 #'
 #' @section What moves and what does not:
-#' The corrected \eqn{\tilde\Phi} replaces \eqn{\hat\Phi} in the P-dynamics,
-#' and the prices of risk absorb the change so that the risk-adjusted dynamics
-#' are left exactly where the cross-section put them:
-#'
-#' \deqn{\tilde\lambda_1 = \hat\lambda_1 + (\tilde\Phi - \hat\Phi)
-#'   \quad\Longrightarrow\quad \tilde\Phi - \tilde\lambda_1 =
-#'   \hat\Phi - \hat\lambda_1}
-#'
-#' and likewise for the intercepts. Fitted yields are therefore *identical*
-#' before and after the correction -- as they should be, since the cross-section
-#' of yields contains no information about how fast the factors mean-revert and
-#' is fitted to well under two basis points either way. What changes is the
-#' expectations component, which is the only part that uses \eqn{\Phi} directly,
-#' and hence the term premium that is its residual. That is precisely BRW's
-#' point: the correction reallocates variation between expectations and term
-#' premium without touching the fit.
+#' The corrected \eqn{\tilde\Phi} goes in through `adopt_p_dynamics()`, so the
+#' risk-adjusted dynamics and every fitted yield are left exactly where the
+#' cross-section put them and only the expectations component moves. That is
+#' precisely BRW's point: the correction reallocates variation between
+#' expectations and term premium without touching the fit.
 #'
 #' Two quantities are deliberately *not* re-estimated. The innovation
 #' covariance \eqn{\Sigma} and the return-regression coefficients keep their
@@ -428,10 +417,7 @@ acm_brw_correct <- function(pars, x, control) {
   # changes. Reduces to mu exactly when phi_new == phi.
   mu_new <- pars$mu + drop((pars$phi - phi_new) %*% bc$x_bar)
 
-  pars$lambda1 <- pars$lambda1 + (phi_new - pars$phi)
-  pars$lambda0 <- pars$lambda0 + (mu_new - pars$mu)
-  pars$phi <- phi_new
-  pars$mu <- mu_new
+  pars <- adopt_p_dynamics(pars, mu_new, phi_new)
 
   if (!bc$converged) {
     warning(

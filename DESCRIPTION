@@ -14,8 +14,13 @@ License: MIT + file LICENSE
 Config/roxygen2/version: 8.0.0
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-Suggests: 
+Imports:
+    graphics,
+    stats,
+    utils
+Suggests:
     knitr,
+    readxl,
     rmarkdown,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3

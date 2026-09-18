@@ -223,6 +223,61 @@ The correction is a bootstrap, so it costs a few seconds and is a Monte Carlo
 estimate; `brw_control()` fixes a seed by default so that repeated fits on the
 same data agree exactly.
 
+## What bias correction does not fix
+
+Persistence is one problem with the estimated dynamics. The other is that ACM
+has no information about where rates settle. Cohen, Hördahl and Xia put it
+plainly: models relying only on yield information are "prone to overreacting to
+changes in the general level of interest rates… they may tend to interpret a
+change in interest rates as evidence that the steady-state interest rate has
+changed correspondingly," producing "exaggerated movements in distant-horizon
+interest rate projections."
+
+That is visible directly. Project the fitted VAR ten years forward and look at
+how much the answer moves:
+
+```{r}
+expected_ahead <- function(f, h) {
+  ex <- f$factors
+  for (p in seq_len(h)) ex <- ex %*% t(f$pars$phi) + rep(f$pars$mu, each = nrow(ex))
+  (f$pars$delta0 + drop(ex %*% f$pars$delta1)) * 12 * 1e4
+}
+c(sd_ols_bp = sd(expected_ahead(fit, 120L)),
+  sd_brw_bp = sd(expected_ahead(bc, 120L)))
+```
+
+A standard deviation of around a percentage point in what the model thinks the
+short rate will be a decade from now, and bias correction does not help,
+because the bias it corrects is not this. Fixing it needs information from
+outside the yield curve.
+
+`p_dynamics = "survey"` supplies it, fitting the factor VAR to published
+forecasts as well as to its own residuals, in the spirit of Kim and Orphanides
+(2012). `spf_tbill()` and `spf_bill10()` fetch free forecasts from the
+Philadelphia Fed. They are not bundled and this vignette does not run them —
+their licence permits research use but not redistribution, so nothing that has
+to build on CRAN is allowed to depend on them. `analysis/validate-spf.R`
+reproduces the following, which is worth stating because it is the opposite of
+what one would guess:
+
+| dynamics | fit to surveys | sd of 10y term premium | **sd of E\[r\] 10y ahead** |
+|---|---|---|---|
+| OLS | — | 139 bp | **100 bp** |
+| surveys, 1–4 quarters only | 27 bp | 84 bp | **157 bp** |
+| surveys, 10-year only | 37 bp | 120 bp | **92 bp** |
+| both | 28 bp | 114 bp | **77 bp** |
+
+Disciplining the model with short-horizon forecasts makes the endpoint problem
+*worse*. To track forecasts that reach only twelve months the VAR becomes more
+persistent, which amplifies exactly the distant-horizon swings the exercise was
+meant to damp. Anchoring the far end requires a far-end forecast, and the 35
+ten-year observations in `BILL10` do more for it than 700 quarterly ones.
+
+Kim and Wright get their far-end anchor from Blue Chip's six-to-eleven-year
+forecasts, which are proprietary. Exact replication of Kim–Wright is therefore
+not possible with free data, and this should be described as Kim–Wright *style*
+and never as a replication of it.
+
 ## Can the short rate account for it?
 
 One input is a genuine modelling choice rather than a given. The short rate
@@ -322,6 +377,10 @@ in dynamic term structure models." *Journal of Business & Economic Statistics*
 
 Cohen, B., P. Hördahl and D. Xia (2018). "Term premia: models and some stylised
 facts." *BIS Quarterly Review*, September.
+
+Kim, D. H. and A. Orphanides (2012). "Term structure estimation with survey
+data on interest rate forecasts." *Journal of Financial and Quantitative
+Analysis* 47(1), 241–272.
 
 Gürkaynak, R. S., B. Sack and J. H. Wright (2007). "The U.S. Treasury yield
 curve: 1961 to the present." *Journal of Monetary Economics* 54(8), 2291–2304.

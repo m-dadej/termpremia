@@ -174,6 +174,43 @@ acm_three_step <- function(x, rx, r) {
   )
 }
 
+#' Install new real-world dynamics without disturbing the pricing
+#'
+#' The seam every alternative step-1 estimator goes through. A new `mu` and
+#' `phi` replace the OLS ones, and the prices of risk absorb the change so that
+#' the risk-adjusted dynamics come out exactly where the cross-section put them:
+#'
+#' \deqn{\tilde\lambda_1 = \hat\lambda_1 + (\tilde\Phi - \hat\Phi)
+#'   \quad\Longrightarrow\quad \tilde\Phi - \tilde\lambda_1 =
+#'   \hat\Phi - \hat\lambda_1}
+#'
+#' and likewise for the intercepts. Fitted yields are therefore unchanged to
+#' machine precision, because they depend on the P-dynamics only through
+#' `phi - lambda1` and `mu - lambda0`. What moves is the expectations
+#' component, which is the only thing that uses `phi` directly, and hence the
+#' term premium that is its residual.
+#'
+#' This is the right division of labour rather than a convenience. A
+#' cross-section of yields on a single date contains no information about how
+#' fast the factors mean-revert; that is a time-series question. An estimator
+#' that improves the answer to it should not be allowed to degrade a
+#' cross-sectional fit that is already good to one or two basis points.
+#'
+#' @param pars Output of `acm_three_step()`.
+#' @param mu_new Replacement intercept.
+#' @param phi_new Replacement autoregressive matrix.
+#'
+#' @return `pars`, updated.
+#' @keywords internal
+#' @noRd
+adopt_p_dynamics <- function(pars, mu_new, phi_new) {
+  pars$lambda1 <- pars$lambda1 + (phi_new - pars$phi)
+  pars$lambda0 <- pars$lambda0 + (mu_new - pars$mu)
+  pars$phi <- phi_new
+  pars$mu <- mu_new
+  pars
+}
+
 #' Largest eigenvalue modulus of a matrix
 #'
 #' The pricing recursion iterates `B[n]' = B[n-1]' (Phi - lambda1) - delta1'`

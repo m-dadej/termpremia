@@ -28,6 +28,20 @@ change before the first CRAN submission. Pin a commit if you build on it.
   the decomposition moves: on US data it takes the factor half-life from 6.5
   years to effectively permanent, and cuts the standard deviation of the
   10-year term premium from 139bp to 120bp.
+* `p_dynamics = "survey"` fits the factor VAR to reproduce published forecasts
+  of the short rate as well as its own residuals, configured with
+  `survey_control()`. This is the documented remedy for ACM reading every
+  persistent move in rates as a shift in the steady state. It is *Kim-Wright
+  style* and not a replication of Kim-Wright, which uses proprietary Blue Chip
+  forecasts and maximum likelihood.
+* `spf_tbill()` and `spf_bill10()` download short-rate forecasts from the
+  Philadelphia Fed's Survey of Professional Forecasters. This data is fetched,
+  never bundled: its licence does not permit redistribution. Needs `readxl`.
+  **Use both.** Short-horizon forecasts alone improve the near-term fit and
+  make the far end worse, because tracking four quarters pushes the VAR to be
+  more persistent; the 35 ten-year observations in `BILL10` do more for the
+  endpoint than the 700 quarterly ones. Together they take the standard
+  deviation of the expected short rate ten years out from 100bp to 77bp.
 
 ## Data handling
 

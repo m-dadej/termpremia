@@ -11,8 +11,10 @@ atsm(
   curve = NULL,
   maturities = NULL,
   return_maturities = NULL,
-  p_dynamics = c("ols", "brw"),
+  p_dynamics = c("ols", "brw", "survey"),
   brw_control = termpremia::brw_control(),
+  survey = NULL,
+  survey_control = termpremia::survey_control(),
   short_rate = NULL,
   short_rate_units = c("auto", "percent", "decimal")
 )
@@ -37,10 +39,20 @@ maturity from 2 upwards.}
 
 \item{p_dynamics}{Estimator for the real-world factor dynamics. \code{"ols"} is
 ACM's own least squares VAR. \code{"brw"} applies the Bauer, Rudebusch and Wu
-(2012) small-sample bias correction to it; see the section below.}
+(2012) small-sample bias correction to it. \code{"survey"} disciplines it to
+match survey forecasts of the short rate. See the two sections below.}
 
 \item{brw_control}{Settings for the bias correction, from \code{\link[=brw_control]{brw_control()}}.
 Ignored unless \code{p_dynamics = "brw"}.}
+
+\item{survey}{Survey forecasts of the short rate, required when
+\code{p_dynamics = "survey"}. A data frame with three columns: \code{date}, when the
+forecast was made; \code{target_date}, the first month it refers to; and
+\code{value}, the forecast rate. \code{\link[=spf_tbill]{spf_tbill()}} returns one in this shape.}
+
+\item{survey_control}{Settings for the survey discipline, from
+\code{\link[=survey_control]{survey_control()}}, which is also where the tenor and averaging of the
+forecast are declared. Ignored unless \code{p_dynamics = "survey"}.}
 
 \item{short_rate}{Optional external one-period short rate, as a data frame
 with \code{date} and \code{value} covering every panel date. Defaults to the panel's
@@ -110,6 +122,34 @@ Monte Carlo, so \code{\link[=brw_control]{brw_control()}} fixes a seed by defaul
 reproducible.
 }
 
+\section{Anchoring the dynamics to surveys}{
+
+The caution above about ACM over-reacting to the level of rates is the other
+half of the same problem, and bias correction does not address it. A model
+that sees only yields has nothing to tell it whether a persistent fall in
+rates is a long swing around an unchanged steady state or a move in the
+steady state itself, and it tends to conclude the latter -- producing
+distant-horizon projections that swing far more than any forecaster's.
+
+\code{p_dynamics = "survey"} adds the missing information. Professional
+forecasters publish what they expect the short rate to be at horizons the
+model also has an opinion about, and the factor VAR is fitted to reproduce
+those forecasts as well as its own one-step-ahead residuals, trading the two
+off through \code{\link[=survey_control]{survey_control()}}'s \code{sd}. This follows Kim and Orphanides
+(2012) and Kim and Wright (2005) in spirit: it is \emph{Kim-Wright style}, not a
+replication of Kim-Wright, which uses proprietary Blue Chip forecasts and
+maximum likelihood rather than a penalised regression.
+
+Free survey data is available: \code{\link[=spf_tbill]{spf_tbill()}} downloads the Philadelphia
+Fed's Survey of Professional Forecasters. It is not bundled with the
+package, because its licence does not permit that.
+
+Both alternatives leave the fit to the yield curve untouched and change only
+the split between expectations and term premium. They are alternatives
+rather than a sequence; \code{"brw"} targets the persistence of the dynamics and
+\code{"survey"} targets where they are heading.
+}
+
 \examples{
 panel <- yield_panel(gsw_monthly, units = "percent",
                      maturity_unit = "months", issuer = "US")
@@ -137,7 +177,12 @@ Statistics} 30(3), 454-467.
 
 Cohen, B., P. Hordahl and D. Xia (2018). "Term premia: models and some
 stylised facts." \emph{BIS Quarterly Review}, September.
+
+Kim, D. H. and A. Orphanides (2012). "Term structure estimation with survey
+data on interest rate forecasts." \emph{Journal of Financial and Quantitative
+Analysis} 47(1), 241-272.
 }
 \seealso{
-\code{\link[=brw_control]{brw_control()}} for the bias correction settings.
+\code{\link[=brw_control]{brw_control()}} and \code{\link[=survey_control]{survey_control()}} for the settings of the two
+alternative P-dynamics, and \code{\link[=spf_tbill]{spf_tbill()}} for free survey data.
 }

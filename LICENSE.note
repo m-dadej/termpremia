@@ -69,3 +69,10 @@ purposes. That is a use restriction rather than a redistribution grant, and it
 is incompatible with an MIT-licensed package usable for any purpose. Survey
 functionality therefore relies on a download helper plus a clearly-labelled
 synthetic fixture for tests.
+
+That is how it is implemented. spf_tbill() and spf_bill10() fetch the data on
+the user's behalf, which puts them in a direct relationship with the
+Philadelphia Fed's terms; no copy is shipped, no test or vignette depends on
+one, and the test suite uses a synthetic survey generated from the model's own
+expectations. analysis/validate-spf.R does the real-data validation and is not
+part of the built package.

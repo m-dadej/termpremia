@@ -309,11 +309,13 @@ as_yield_decimal <- function(x, units, arg) {
 
   if (units == "auto") {
     units <- if (max(abs(rng)) > 1) "percent" else "decimal"
+    # Named after the argument rather than after yield_panel(), because survey
+    # forecasts and external short rates come through here too.
     message(
-      "yield_panel(): inferred yields are in ", units,
+      "Inferred that `", arg, "` is in ", units,
       " (observed range ", format(rng[1], digits = 3), " to ",
       format(rng[2], digits = 3), "). ",
-      "Set `units` explicitly if that is wrong."
+      "Set the units explicitly if that is wrong."
     )
   }
 
