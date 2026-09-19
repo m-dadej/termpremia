@@ -408,12 +408,22 @@ NULL
 #' @rdname atsm-extractors
 #' @export
 term_premium <- function(object, maturity = NULL, ...) {
+  UseMethod("term_premium")
+}
+
+#' @export
+term_premium.atsm_fit <- function(object, maturity = NULL, ...) {
   extract_component(object, "term_premium", maturity)
 }
 
 #' @rdname atsm-extractors
 #' @export
 risk_neutral <- function(object, maturity = NULL, ...) {
+  UseMethod("risk_neutral")
+}
+
+#' @export
+risk_neutral.atsm_fit <- function(object, maturity = NULL, ...) {
   extract_component(object, "risk_neutral", maturity)
 }
 
@@ -424,6 +434,11 @@ risk_neutral <- function(object, maturity = NULL, ...) {
 #'   instantaneous forecast of the policy rate.
 #' @export
 expected_short_rate <- function(object, maturity = NULL, ...) {
+  UseMethod("expected_short_rate")
+}
+
+#' @export
+expected_short_rate.atsm_fit <- function(object, maturity = NULL, ...) {
   extract_component(object, "risk_neutral", maturity)
 }
 
