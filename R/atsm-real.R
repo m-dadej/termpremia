@@ -81,6 +81,10 @@
 #'   fitted nominal yield is used, which for a curve fitted without bills is
 #'   an extrapolation. See the `short_rate` discussion in [atsm()].
 #' @param short_rate_units Units of `short_rate$value`.
+#' @param fix_pi0 Hold the inflation intercept fixed instead of estimating
+#'   it. `TRUE` fixes it at the sample mean of realised inflation, a number
+#'   fixes it there (in monthly rate units), and `NULL` estimates it. The
+#'   paper's UK specification fixes it; its US specification does not.
 #'
 #' @return An object of class `atsm_real_fit`.
 #'
@@ -126,7 +130,8 @@ atsm_real <- function(panel,
                       return_maturities = NULL,
                       real_return_maturities = NULL,
                       short_rate = NULL,
-                      short_rate_units = c("auto", "percent", "decimal")) {
+                      short_rate_units = c("auto", "percent", "decimal"),
+                      fix_pi0 = NULL) {
   inflation_units <- match.arg(inflation_units)
   short_rate_units <- match.arg(short_rate_units)
 
@@ -223,7 +228,7 @@ atsm_real <- function(panel,
   # --- estimate ------------------------------------------------------------
   n_max <- max(maturities, real_maturities)
   pars <- acmy_closed_form(x, rx_nom, rx_real, infl, r,
-                           real_return_maturities, n_max)
+                           real_return_maturities, n_max, fix_pi0)
 
   rho_q <- spectral_radius(pars$phi_tilde)
   rho_p <- spectral_radius(pars$phi)

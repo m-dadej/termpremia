@@ -804,3 +804,75 @@ test_that("the whitener turns GLS into ordinary least squares", {
                     crossprod(b, solve(sigma_e, y))))
   expect_equal(drop(qr.solve(whiten(b), whiten(y))), gls, tolerance = 1e-8)
 })
+
+
+# Fixing the inflation intercept ------------------------------------------
+
+test_that("fix_pi0 holds the intercept where it is put", {
+  # The UK specification of the Supplementary Appendix fixes pi0; the US one
+  # estimates it.
+  d <- sim_fit()
+  s <- d$s
+
+  free <- d$fit
+  expect_false(free$pars$inflation_fit$pi0_fixed)
+
+  at_mean <- suppressWarnings(suppressMessages(
+    atsm_real(sim_panel(s), inflation = sim_cpi(s), short_rate = sim_sr(s),
+              short_rate_units = "percent", fix_pi0 = TRUE)))
+  expect_true(at_mean$pars$inflation_fit$pi0_fixed)
+  expect_equal(at_mean$pars$pi0, mean(at_mean$inflation), tolerance = 1e-14)
+
+  at_value <- suppressWarnings(suppressMessages(
+    atsm_real(sim_panel(s), inflation = sim_cpi(s), short_rate = sim_sr(s),
+              short_rate_units = "percent", fix_pi0 = 0.002)))
+  expect_equal(at_value$pars$pi0, 0.002, tolerance = 1e-15)
+
+  # pi1 still has to be estimated, and the decomposition identities still hold.
+  expect_false(isTRUE(all.equal(at_value$pars$pi1,
+                                at_value$pars$inflation_fit$pi1_ols)))
+  expect_equal(at_value$breakeven,
+               at_value$expected_inflation + at_value$inflation_risk_premium,
+               tolerance = 1e-15)
+})
+
+test_that("fixing pi0 at the truth is at least as good as fixing it wrongly", {
+  # The mechanism behind the UK replication's sharpest finding: pi0 sets the
+  # level of the real curve almost one for one, so fixing it away from the
+  # data costs real-curve fit and nothing else.
+  s <- sim_acmy()
+  args <- list(sim_panel(s), inflation = sim_cpi(s), short_rate = sim_sr(s),
+               short_rate_units = "percent")
+
+  right <- suppressWarnings(suppressMessages(
+    do.call(atsm_real, c(args, list(fix_pi0 = s$truth$pi0)))))
+  wrong <- suppressWarnings(suppressMessages(
+    do.call(atsm_real, c(args, list(fix_pi0 = s$truth$pi0 + 0.001)))))
+
+  rmse <- function(f) sqrt(mean((f$observed_real - f$fitted_real)^2)) * 1e4
+  expect_lt(rmse(right), rmse(wrong))
+
+  # The nominal curve does not care: pi enters only the real recursion.
+  expect_equal(right$fitted, wrong$fitted, tolerance = 1e-14)
+
+  # And the damage is a level shift, of about the size of the error in pi0:
+  # 0.001 monthly is 120bp annualised.
+  shift <- mean(wrong$fitted_real - right$fitted_real) * 1e4
+  expect_gt(abs(shift), 50)
+})
+
+test_that("fix_pi0 rejects what it cannot use", {
+  s <- sim_acmy(tt = 150L)
+  expect_error(
+    suppressWarnings(suppressMessages(
+      atsm_real(sim_panel(s), inflation = sim_cpi(s), short_rate = sim_sr(s),
+                short_rate_units = "percent", fix_pi0 = c(1, 2)))),
+    "single finite number"
+  )
+  expect_error(
+    suppressWarnings(suppressMessages(
+      atsm_real(sim_panel(s), inflation = sim_cpi(s), short_rate = sim_sr(s),
+                short_rate_units = "percent", fix_pi0 = NA))),
+    "single finite number"
+  )
+})

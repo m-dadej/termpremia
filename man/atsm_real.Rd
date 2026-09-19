@@ -18,7 +18,8 @@ atsm_real(
   return_maturities = NULL,
   real_return_maturities = NULL,
   short_rate = NULL,
-  short_rate_units = c("auto", "percent", "decimal")
+  short_rate_units = c("auto", "percent", "decimal"),
+  fix_pi0 = NULL
 )
 }
 \arguments{
@@ -59,6 +60,11 @@ fitted nominal yield is used, which for a curve fitted without bills is
 an extrapolation. See the \code{short_rate} discussion in \code{\link[=atsm]{atsm()}}.}
 
 \item{short_rate_units}{Units of \code{short_rate$value}.}
+
+\item{fix_pi0}{Hold the inflation intercept fixed instead of estimating
+it. \code{TRUE} fixes it at the sample mean of realised inflation, a number
+fixes it there (in monthly rate units), and \code{NULL} estimates it. The
+paper's UK specification fixes it; its US specification does not.}
 }
 \value{
 An object of class \code{atsm_real_fit}.

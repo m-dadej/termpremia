@@ -313,7 +313,7 @@ acmy_factors <- function(y_nom, y_real, k_nominal, k_real, liquidity = NULL) {
 #' @keywords internal
 #' @noRd
 acmy_closed_form <- function(x, rx_nom, rx_real, inflation, r,
-                             real_maturities, n_max) {
+                             real_maturities, n_max, fix_pi0 = NULL) {
   tt <- nrow(x)
   k <- ncol(x)
 
@@ -390,7 +390,8 @@ acmy_closed_form <- function(x, rx_nom, rx_real, inflation, r,
 
   # --- inflation loadings (Eq. S31) ----------------------------------------
   pi_fit <- acmy_fit_inflation(x, rx_real, inflation, real_maturities, n_max,
-                               mu_tilde, phi_tilde, sigma, delta0, delta1)
+                               mu_tilde, phi_tilde, sigma, delta0, delta1,
+                               fix_pi0)
 
   list(
     mu = mu, phi = phi, sigma = sigma,
@@ -428,7 +429,8 @@ acmy_closed_form <- function(x, rx_nom, rx_real, inflation, r,
 #' @keywords internal
 #' @noRd
 acmy_fit_inflation <- function(x, rx_real, inflation, real_maturities, n_max,
-                               mu_tilde, phi_tilde, sigma, delta0, delta1) {
+                               mu_tilde, phi_tilde, sigma, delta0, delta1,
+                               fix_pi0 = NULL) {
   tt <- nrow(x)
   k <- ncol(x)
   x_lag <- x[-tt, , drop = FALSE]
@@ -436,29 +438,52 @@ acmy_fit_inflation <- function(x, rx_real, inflation, real_maturities, n_max,
 
   zi <- cbind(1, x)
   icoef <- qr.solve(zi, inflation)
-  start <- c(icoef[1L], icoef[-1L])
+
+  # `fix_pi0` holds the inflation intercept at a supplied value instead of
+  # estimating it, which is what the UK specification of the Supplementary
+  # Appendix does ("Average RPI inflation during this sample period is 2.48%
+  # ... we fix pi0 in the estimation"). With a shorter real curve and fewer
+  # return maturities, the level and the slope of inflation are weakly
+  # separated, and pinning the level at its sample mean is the sane response.
+  # `TRUE` means the sample mean of realised inflation.
+  pi0_fixed <- NULL
+  if (!is.null(fix_pi0) && !identical(fix_pi0, FALSE)) {
+    pi0_fixed <- if (isTRUE(fix_pi0)) mean(inflation) else as.numeric(fix_pi0)
+    if (length(pi0_fixed) != 1L || !is.finite(pi0_fixed)) {
+      stop("`fix_pi0` must be TRUE, FALSE, or a single finite number in ",
+           "monthly rate units.", call. = FALSE)
+    }
+  }
+
+  start <- if (is.null(pi0_fixed)) c(icoef[1L], icoef[-1L]) else icoef[-1L]
+
+  unpack <- function(theta) {
+    if (is.null(pi0_fixed)) list(pi0 = theta[1L], pi1 = theta[-1L])
+    else list(pi0 = pi0_fixed, pi1 = theta)
+  }
 
   objective <- function(theta) {
-    pi0 <- theta[1L]
-    pi1 <- theta[-1L]
+    p <- unpack(theta)
     coefs <- acmy_coefficients(n_max, mu_tilde, phi_tilde, sigma,
-                               delta0, delta1, pi0, pi1)
+                               delta0, delta1, p$pi0, p$pi1)
     if (!all(is.finite(coefs$b_real))) return(.Machine$double.xmax)
 
     model <- acmy_real_returns(coefs, real_maturities, x_lag, x_led,
-                               mu_tilde, phi_tilde, sigma, pi0, pi1)
+                               mu_tilde, phi_tilde, sigma, p$pi0, p$pi1)
     if (!all(is.finite(model))) return(.Machine$double.xmax)
     sum((rx_real - model)^2)
   }
 
   fit <- stats::optim(start, objective, method = "BFGS",
                       control = list(maxit = 2000L, reltol = 1e-12))
+  out <- unpack(fit$par)
 
   list(
-    pi0 = fit$par[1L],
-    pi1 = fit$par[-1L],
-    pi0_ols = start[1L],
-    pi1_ols = start[-1L],
+    pi0 = out$pi0,
+    pi1 = out$pi1,
+    pi0_fixed = !is.null(pi0_fixed),
+    pi0_ols = icoef[1L],
+    pi1_ols = icoef[-1L],
     converged = fit$convergence == 0L,
     convergence = fit$convergence,
     iterations = unname(fit$counts[["gradient"]]),
