@@ -182,9 +182,15 @@ atsm <- function(panel,
     stop("The selected yields contain missing values. ACM requires a complete ",
          "panel; drop incomplete maturities or dates first.", call. = FALSE)
   }
-  if (!1 %in% maturities) {
-    stop("The one-month maturity is required as the short rate. Include it in ",
-         "`maturities`.", call. = FALSE)
+  # Only needed as the FALLBACK short rate. Requiring it even when the caller
+  # supplies `short_rate` blocks a legitimate specification: other
+  # implementations of this estimator drop the first maturities from the
+  # factor extraction precisely because a curve fitted without bills has an
+  # unreliable short end, and then take the short rate from elsewhere.
+  if (is.null(short_rate) && !1 %in% maturities) {
+    stop("The one-month maturity is required as the short rate, unless you ",
+         "supply one through `short_rate`. Include it in `maturities`, or ",
+         "pass `short_rate`.", call. = FALSE)
   }
 
   return_maturities <- return_maturities %||%
@@ -204,8 +210,8 @@ atsm <- function(panel,
   x <- fac$scores
   rownames(x) <- rownames(y)
 
-  r <- resolve_short_rate(short_rate, short_rate_units, panel$dates,
-                          y[, match(1L, maturities)])
+  fallback <- if (1 %in% maturities) y[, match(1L, maturities)] else NULL
+  r <- resolve_short_rate(short_rate, short_rate_units, panel$dates, fallback)
   rx <- acm_excess_returns(p, maturities, return_maturities, r)
 
   pars <- acm_three_step(x, rx, r)

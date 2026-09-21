@@ -19,7 +19,9 @@ atsm_real(
   real_return_maturities = NULL,
   short_rate = NULL,
   short_rate_units = c("auto", "percent", "decimal"),
-  fix_pi0 = NULL
+  fix_pi0 = NULL,
+  method = c("closed_form", "ml"),
+  acmy_control = termpremia::acmy_control()
 )
 }
 \arguments{
@@ -65,6 +67,17 @@ an extrapolation. See the \code{short_rate} discussion in \code{\link[=atsm]{ats
 it. \code{TRUE} fixes it at the sample mean of realised inflation, a number
 fixes it there (in monthly rate units), and \code{NULL} estimates it. The
 paper's UK specification fixes it; its US specification does not.}
+
+\item{method}{\code{"closed_form"} uses the regression estimator of
+Supplementary Appendix Section 1.1 -- which is what the paper uses as its
+STARTING VALUE. \code{"ml"} goes on to the constrained maximum likelihood of
+Section 1, which is the paper's actual estimator. The closed form fits
+excess returns and leaves yield levels unconstrained; the likelihood step
+adds the restriction that factors extracted from the model's own fitted
+yields equal the observed factors, and it is that which pins levels down.
+It costs a minute or two.}
+
+\item{acmy_control}{Settings for the likelihood step; see \code{\link[=acmy_control]{acmy_control()}}.}
 }
 \value{
 An object of class \code{atsm_real_fit}.

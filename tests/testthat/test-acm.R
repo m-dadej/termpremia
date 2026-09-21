@@ -246,6 +246,45 @@ test_that("atsm validates its inputs", {
   expect_error(atsm(panel, maturities = c(12, 24, 36)), "one-month maturity")
 })
 
+test_that("a supplied short rate removes the need for the one-month yield", {
+  # The one-month point is only the FALLBACK short rate. Requiring it even
+  # when the caller supplies their own blocks a real specification: other
+  # implementations of this estimator drop the first maturities from the
+  # factor extraction, precisely because a curve fitted without bills has an
+  # unreliable short end, and take the short rate from elsewhere.
+  panel <- us_panel()
+  grid <- panel$maturities[[1L]]
+  short <- data.frame(date = panel$dates,
+                      value = curve_matrix(panel)[, match(1L, grid)])
+
+  expect_error(atsm(panel, maturities = 3:120), "unless you supply one")
+
+  f <- suppressWarnings(atsm(panel, n_factors = 3L, maturities = 3:120,
+                             short_rate = short,
+                             short_rate_units = "decimal"))
+  expect_equal(f$maturities, 3:120)
+  expect_false(1 %in% f$maturities)
+  expect_lt(sqrt(mean((f$observed - f$fitted)^2)) * 1e4, 10)
+
+  # The short rate really is the supplied one. delta is a projection of it
+  # onto the factors, not an identity, so what can be asserted is that the
+  # projection tracks the series supplied -- and that it beats the projection
+  # of a different candidate short rate.
+  fitted_r <- f$pars$delta0 + drop(f$factors %*% f$pars$delta1)
+  expect_gt(stats::cor(fitted_r, short$value / 12), 0.9)
+
+  # It tracks the supplied series better than an unrelated tenor does.
+  other <- curve_matrix(panel)[, match(120L, grid)] / 12
+  expect_lt(mean((fitted_r - short$value / 12)^2),
+            mean((fitted_r - other)^2))
+
+  # That correlation is 0.94, not 0.999, and the shortfall is the point:
+  # three components drawn from months 3-120 cannot reproduce the one-month
+  # yield, which is exactly why an external short rate is worth supplying.
+  # See the offset investigation in HANDOVER 4.
+  expect_lt(stats::cor(fitted_r, short$value / 12), 0.99)
+})
+
 test_that("print and summary run", {
   f <- us_fit()
   expect_output(print(f), "atsm_fit")

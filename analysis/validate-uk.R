@@ -23,49 +23,64 @@
 #
 # Results as of September 2026:
 #
-#   nominal pricing errors, bp      ours          appendix
-#     mean, 3y                      3.1           "about 2"
-#     mean, 10y                     4.0           "about 3"
-#     sd, all maturities            4.5 to 9.4    "less than four"
+#   nominal pricing errors, bp   ours (ML)   closed form    appendix
+#     mean, 3y                        0.8         3.1        "about 2"
+#     mean, 10y                       1.2         4.0        "about 3"
+#     sd, all maturities        2.2 to 9.2  4.5 to 9.4       "less than four"
+#     RMSE                           5.69        7.30
 #
-#   real pricing errors, bp         ours          appendix
-#     mean, all maturities         -12 to -15     "an average of .1"
-#     sd, 7-8y                      1.6 to 3.1    1.4 (5y) to 2.6 (10y)
-#     sd after removing the level   6.4 overall
+#   real pricing errors, bp      ours (ML)   closed form    appendix
+#     mean, all maturities      -1.2 to 0.6  -12 to -15     "an average of .1"
+#     sd, 5y to 10y             0.4 to 2.1   1.6 to 13.8    1.4 (5y), 2.6 (10y)
+#     RMSE                           1.17       15.26
+#     rho_Q                        0.9949       1.0020
 #
-# THE INTERESTING RESULT: LEVEL VERSUS DYNAMICS. The real curve's *dynamics*
-# come out at the appendix's own precision -- standard deviations of 1.6 to
-# 3.1bp against their 1.4 to 2.6bp -- but the whole curve sits about 14bp too
-# high, uniformly across maturities. That is exactly the signature of the
-# missing estimation step. The closed-form estimator fits excess RETURNS; the
-# constrained maximum likelihood step adds the constraints on A that pin yield
-# LEVELS. Getting the shape right and the level wrong is what omitting them
-# should look like, and it is a sharper diagnosis than the US replication
-# could give.
+# LEVEL VERSUS DYNAMICS, AND WHAT FIXED IT. This exercise is where the value
+# of the maximum likelihood step became visible. Under the closed form alone
+# the real curve's DYNAMICS came out at the appendix's own precision --
+# standard deviations of 1.6 to 3.1bp against their 1.4 to 2.6 -- while the
+# whole curve sat about 14bp too high, uniformly across maturities. That is
+# the signature of an estimator that fits excess RETURNS and leaves LEVELS
+# unconstrained.
 #
-#   10y decomposition, bp
-#     nominal term premium         175 (sd  77)
-#     real term premium            117 (sd  54)
-#     breakeven inflation          382 (sd 153)
-#       expected inflation         323 (sd  63)
-#       inflation risk premium      59 (sd  94)
+# The likelihood step adds exactly the missing restriction, that factors
+# extracted from the model's own fitted yields equal the observed factors.
+# The level error collapses from 14bp to about 1bp, the real RMSE from 15.3 to
+# 1.2, the nominal RMSE from 7.3 to 5.7, and the risk-adjusted spectral radius
+# from 1.0020 -- explosive -- to 0.9949. It costs about three minutes.
+#
+#   10y decomposition under ML, bp
+#     expected inflation           275
+#     inflation risk premium       121
 #
 # FINDING 1 (partial). The appendix reports the nominal term premium
 # "fluctuating around 1-2% in the first part of the sample but dropping to
 # mostly negative values in the latter part". Ours declines steadily -- 246bp
-# over 1985-1994, 164bp over 1995-2003, 108bp over 2004-2012 -- so the
+# over 1985-1994, 168bp over 1995-2003, 111bp over 2004-2012 -- so the
 # direction and the early level are right, but it does not turn negative
 # (only 6% of months after 2004). Consistent with the level problem above.
 #
-# FINDING 2 (replicates, and this is the appendix's most interesting claim).
+# FINDING 2 (replicates under the closed form; NOT under maximum likelihood).
 # The inflation risk premium "declines steadily since the introduction of the
 # inflation target in the U.K. in 1992" with "a further drop around the years
 # 1997 and 1998 when the Bank of England was granted independence":
 #
-#     1985-1991   192 bp
-#     1992-1996    99 bp     <- inflation target introduced 1992
-#     1997-1998    10 bp     <- Bank of England granted independence
-#     1999-2012   -15 bp
+#                      closed form    ML
+#     1985-1991          192 bp      163 bp
+#     1992-1996           99 bp      119 bp   <- inflation target, 1992
+#     1997-1998           10 bp       70 bp   <- BoE independence, 1997-98
+#     1999-2012          -15 bp      108 bp
+#     trend after 1992  -7.2 bp/y   +1.2 bp/y
+#
+# and this is the one place the two estimators disagree about economics
+# rather than fit. Under the closed form the finding replicates cleanly.
+# Under the likelihood step -- which fits both curves far better -- expected
+# inflation takes much more of the variation (sd 124bp against 63) and the
+# risk premium much less (43 against 94), so the decline flattens. The split
+# between the two is not pinned down by the cross-sectional fit, which both
+# estimators now get right. Candidates: the missing liquidity factor, pi0
+# fixed at our measured 3.57% rather than the appendix's 2.48%, and two real
+# factors rather than three. Reported, not resolved.
 #
 # THE APPENDIX'S 2.48% CANNOT BE RIGHT. It states "Average RPI inflation
 # during this sample period is 2.48%" and fixes pi0 accordingly. Measured
@@ -78,6 +93,7 @@
 # as a sensitivity rather than silently corrected.
 #
 # Usage: Rscript analysis/validate-uk.R
+#        Rscript analysis/validate-uk.R --closed-form   (skip the ML step)
 # =========================================================================
 
 SAMPLE_START <- as.Date("1985-01-01")
@@ -93,6 +109,13 @@ CACHE        <- file.path("data-raw", ".cache")
 # slip; the sensitivity at the bottom shows it makes little difference.
 RET_NOMINAL <- c(6L, 12L, seq(24L, 120L, by = 12L))   # N = 11, as stated
 RET_REAL <- seq(60L, 120L, by = 6L)
+
+# The likelihood step is the appendix's actual estimator and the default.
+METHOD <- if ("--closed-form" %in% commandArgs(trailingOnly = TRUE)) {
+  "closed_form"
+} else {
+  "ml"
+}
 
 # --- load the package ----------------------------------------------------
 
@@ -190,18 +213,24 @@ cat(sprintf("  the appendix states %.2f%% -- a gap of %.2f pp\n\n",
 # --- fit -----------------------------------------------------------------
 
 fit_uk <- function(..., return_maturities = RET_NOMINAL,
-                   real_return_maturities = RET_REAL) {
+                   real_return_maturities = RET_REAL,
+                   method = "closed_form") {
   suppressWarnings(atsm_real(
     panel, inflation = rpi,
     return_maturities = return_maturities,
-    real_return_maturities = real_return_maturities, ...
+    real_return_maturities = real_return_maturities, method = method, ...
   ))
 }
 
 # The appendix fixes pi0. Fixed here at the sample mean of realised inflation,
 # which is what "we fix pi0" can only reasonably mean given that its stated
 # 2.48% does not describe this data.
-fit <- fit_uk(fix_pi0 = TRUE)
+cat("Fitting (", METHOD, ")",
+    if (METHOD == "ml") " -- the likelihood step takes a few minutes" else "",
+    "
+
+", sep = "")
+fit <- fit_uk(fix_pi0 = TRUE, method = METHOD)
 
 cat("=========================================================================\n")
 print(fit)
@@ -256,11 +285,21 @@ cat(sprintf("  real RMSE                       : %.2f bp\n",
             sqrt(mean(er^2))))
 cat(sprintf("  real RMSE with the level removed: %.2f bp\n",
             sqrt(mean(scale(er, scale = FALSE)^2))))
-cat("  The standard deviations sit inside the appendix's range while every\n")
-cat("  mean is about 14bp off in the same direction. The dynamics are right\n")
-cat("  and the level is not, which is what omitting the constrained maximum\n")
-cat("  likelihood step should look like: it fits returns, and the\n")
-cat("  constraints on A are what pin levels.\n\n")
+if (METHOD == "ml") {
+  cat("  Both the means and the standard deviations now sit inside the\n")
+  cat("  appendix's range. Run with --closed-form to see what the\n")
+  cat("  factor-consistency restrictions are doing: without them every mean\n")
+  cat("  comes out about 14bp off in the same direction while the standard\n")
+  cat("  deviations stay right, because the closed form fits excess returns\n")
+  cat("  and leaves yield levels alone.\n\n")
+} else {
+  cat("  The standard deviations sit inside the appendix's range while every\n")
+  cat("  mean is about 14bp off in the same direction. The dynamics are\n")
+  cat("  right and the level is not, which is exactly what omitting the\n")
+  cat("  constrained maximum likelihood step looks like: it fits returns,\n")
+  cat("  and the constraints on A are what pin levels. Drop --closed-form\n")
+  cat("  to add them.\n\n")
+}
 
 # --- decomposition ------------------------------------------------------
 
@@ -333,11 +372,29 @@ cat("            granted independence'\n")
 monotone <- era(irp, "1985-01-01", "1991-12-31") >
   era(irp, "1992-01-01", "1996-12-31") &&
   era(irp, "1992-01-01", "1996-12-31") > era(irp, "1997-01-01", "1998-12-31")
-cat(sprintf("  VERDICT: %s\n\n", if (monotone && slope < 0) {
+cat(sprintf("  VERDICT: %s\n", if (monotone && slope < 0) {
   "REPLICATES -- steady decline, with the 1997-98 step clearly visible."
+} else if (monotone) {
+  paste0("PARTIAL -- falls across the three regime eras but does not\n",
+         "           trend down after 1992.")
 } else {
   "DOES NOT REPLICATE."
 }))
+
+# This finding is estimator-sensitive and that is worth stating outright.
+cat("\n  NOTE, and it is the one place the two estimators disagree about\n")
+cat("  economics rather than fit. Under the closed form this finding\n")
+cat("  replicates cleanly -- 192, 99, 10, -15bp across the four eras, with a\n")
+cat("  trend of -7bp a year. Under the likelihood step the fit diagnostics\n")
+cat("  improve a lot and this decomposition changes: expected inflation\n")
+cat("  takes on much more of the variation (sd 124bp against 63) and the\n")
+cat("  inflation risk premium much less (43 against 94), so the post-1992\n")
+cat("  decline flattens out.\n")
+cat("  The split between the two is not pinned down by the cross-sectional\n")
+cat("  fit, which both estimators get right, and the candidates for the\n")
+cat("  difference are the missing liquidity factor, pi0 being fixed at our\n")
+cat("  measured 3.57%% rather than the appendix's 2.48%%, and two real\n")
+cat("  factors rather than three. Reported rather than resolved.\n\n")
 
 # --- identities ---------------------------------------------------------
 
@@ -365,8 +422,11 @@ line <- function(lab, f) {
 }
 
 cat("  RMSE in bp. The appendix's specification is 3 nominal + 2 real\n")
-cat("  factors with pi0 fixed.\n\n")
-line("pi0 fixed at the sample mean", fit)
+cat("  factors with pi0 fixed. The headline row uses the estimator chosen\n")
+cat("  above; every other row is CLOSED FORM, because running the\n")
+cat("  likelihood step six more times would take twenty minutes and the\n")
+cat("  comparisons below are about specification, not estimator.\n\n")
+line(paste0("pi0 at sample mean (", METHOD, ")"), fit)
 line("pi0 estimated freely", fit_uk())
 line("pi0 fixed at the appendix's 2.48%", fit_uk(fix_pi0 = PAPER_PI0 / 12))
 cat("\n  Fixing pi0 at 2.48% costs about 105bp of real-curve level, which is\n")

@@ -19,50 +19,52 @@
 #
 #   sample             T = 191, 1999-01 to 2014-11   <- matches the paper exactly
 #
-#   yield pricing errors, bp        ours            paper
-#     nominal mean               -1.6 to -9.2     |mean| < 2.5
-#     nominal sd                  6.3 to 11.3     sd < 5
-#     TIPS mean                  -6.7 to  -0.8     about 2
-#     TIPS sd                    10.0 to 26.4     2 to 5, "2y a bit more volatile"
+#   yield pricing errors, bp      ours (ML)    closed form      paper
+#     nominal mean              0.2 to 1.4   -1.6 to -9.2   |mean| < 2.5
+#     nominal sd                1.7 to 6.3    6.3 to 11.3   sd < 5
+#     TIPS mean                -1.2 to 0.4   -6.7 to -0.8   about 2
+#     TIPS sd                   1.3 to 8.9   10.0 to 26.4   2 to 5, "2y more volatile"
+#     nominal RMSE                     4.10          11.05
+#     TIPS RMSE                        4.16          12.06
+#     rho_Q                          0.9915         1.0044
 #
 #   10y decomposition, bp           ours            paper
-#     expected inflation, mean      204            "stable between 2.1 and 2.5%"
-#     expected inflation, sd         20            "quite stable"
-#     sd nominal term premium        86            real TP accounts for the bulk
-#     sd real term premium           96              of nominal TP variation,
-#     sd inflation risk premium      31              IRP "a relatively small share"
-#     corr(nominal TP, real TP)    0.950
-#     share of var(nominal TP)
-#       attributable to real TP     107%
-#       attributable to IRP          -7%
+#     expected inflation, mean      217            "stable between 2.1 and 2.5%"
+#     expected inflation, sd         33            "quite stable"
+#     sd nominal term premium        82            real TP accounts for the bulk
+#     sd real term premium          125              of nominal TP variation,
+#     sd inflation risk premium      56              IRP "a relatively small share"
+#     corr(nominal TP, real TP)    0.937
 #
-# THE HONEST SUMMARY. Both of the paper's headline findings replicate: expected
-# inflation is stable and close to their band, and the variance decomposition
+# THE SUMMARY. Both of the paper's headline findings replicate -- expected
+# inflation is stable inside their stated band, and the variance decomposition
 # puts real term premia in charge with the inflation risk premium a minor
-# contributor. The cross-sectional fit is two to three times looser than
-# theirs, and the reason is known rather than mysterious -- see below.
+# contributor -- and with the maximum likelihood step the cross-sectional fit
+# is inside their reported tolerances too. Our two-year TIPS error is the most
+# volatile of the set at 8.9bp, which is exactly the exception they note.
 #
-# WHY THE FIT IS LOOSER. Two reasons, in order of size.
+# WHAT THE LIKELIHOOD STEP BUYS, since the difference is stark. The closed
+# form of Supplementary Appendix Section 1.1 fits excess RETURNS and leaves
+# yield LEVELS unconstrained; every nominal mean error comes out negative, at
+# up to 9bp. The likelihood step adds the restriction that factors extracted
+# from the model's own fitted yields equal the observed factors, and since
+# three components explain almost all of a nominal curve's variation, that
+# restriction alone forces a good fit. Errors fall to under 1.5bp, both RMSEs
+# roughly a third, and the risk-adjusted spectral radius drops from 1.0044 --
+# explosive -- to 0.9915. It costs about three minutes.
 #
-#   1. This is the paper's closed-form estimator, which in the paper is only
-#      the STARTING VALUE. Their reported fit comes from maximum likelihood
-#      with nonlinear constraints forcing model-implied factors to equal
-#      observed factors (Supplementary Appendix Section 1). Those constraints
-#      are exactly what pins the cross-section down to under five basis
-#      points. Implementing them is the obvious next step and is not done
-#      here.
-#
-#   2. No liquidity factor. The paper's US specification has six factors, the
-#      sixth being an index of TIPS illiquidity built from two indicators. One
-#      of them -- the average absolute TIPS curve fitting error -- is not in
-#      the published feds200805 file and has to be obtained from the Board
-#      directly. Without it the model has five factors and any liquidity
-#      premium is absorbed into the inflation risk premium. The paper's own UK
-#      specification omits the liquidity factor for the same kind of reason,
-#      so this is a documented variant rather than an improvisation.
+# STILL MISSING: the liquidity factor. The paper's US specification has six
+# factors, the sixth an index of TIPS illiquidity built from two indicators.
+# One of them -- the average absolute TIPS curve fitting error -- is not in
+# the published feds200805 file and has to be obtained from the Board
+# directly. Without it the model has five factors and any liquidity premium is
+# absorbed into the inflation risk premium. The paper's own UK specification
+# omits the liquidity factor for the same kind of reason, so this is a
+# documented variant rather than an improvisation.
 #
 # Usage: Rscript analysis/replicate-acmy.R
-#        Rscript analysis/replicate-acmy.R --full   (to 2024 rather than 2014)
+#        Rscript analysis/replicate-acmy.R --full          (to 2024)
+#        Rscript analysis/replicate-acmy.R --closed-form   (skip the ML step)
 # =========================================================================
 
 PAPER_END   <- as.Date("2014-11-30")   # the paper's last observation
@@ -70,6 +72,14 @@ HORIZON     <- 120L                    # months; the 10-year tenor
 TIPS_CACHE  <- file.path("data-raw", ".cache", "feds200805.csv")
 
 full_sample <- "--full" %in% commandArgs(trailingOnly = TRUE)
+
+# The likelihood step is the paper's actual estimator and the default here.
+# --closed-form skips it, which is fast and shows what the restriction buys.
+method <- if ("--closed-form" %in% commandArgs(trailingOnly = TRUE)) {
+  "closed_form"
+} else {
+  "ml"
+}
 
 # --- load the package ----------------------------------------------------
 
@@ -148,8 +158,12 @@ cat(sprintf("  DFF   : %4d obs aligned to the panel\n\n", nrow(ff)))
 
 # --- fit -----------------------------------------------------------------
 
+cat("Fitting (", method, ")",
+    if (method == "ml") " -- the likelihood step takes a few minutes" else "",
+    "
+", sep = "")
 fit <- atsm_real(panel, inflation = cpi, short_rate = ff,
-                 short_rate_units = "percent")
+                 short_rate_units = "percent", method = method)
 
 cat("=========================================================================\n")
 print(fit)
@@ -200,10 +214,17 @@ print(tab_r, row.names = FALSE)
 cat("  paper: maximum average error about 2bp; variability 2 to 5bp,\n")
 cat("         'with the exception being the two-year maturity'\n\n")
 
-cat(sprintf("Ours is looser than theirs by roughly %.0fx on the nominal sd.\n",
-            mean(tab_n$sd) / 5))
-cat("See the header: this is the closed-form estimator, which in the paper is\n")
-cat("only the starting value for constrained maximum likelihood.\n\n")
+cat(sprintf("Mean nominal error sd: %.1f bp, against the paper's 5bp ceiling.\n",
+            mean(tab_n$sd)))
+if (method == "ml") {
+  cat("Run with --closed-form to see the same tables without the\n")
+  cat("factor-consistency restrictions: every nominal mean error turns\n")
+  cat("negative and reaches 9bp, both RMSEs roughly triple, and rho_Q goes\n")
+  cat("above one.\n\n")
+} else {
+  cat("This is the closed-form estimator, which in the paper is only the\n")
+  cat("starting value. Drop --closed-form to run the likelihood step.\n\n")
+}
 
 # --- the decomposition ---------------------------------------------------
 

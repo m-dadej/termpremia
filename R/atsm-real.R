@@ -81,6 +81,15 @@
 #'   fitted nominal yield is used, which for a curve fitted without bills is
 #'   an extrapolation. See the `short_rate` discussion in [atsm()].
 #' @param short_rate_units Units of `short_rate$value`.
+#' @param method `"closed_form"` uses the regression estimator of
+#'   Supplementary Appendix Section 1.1 -- which is what the paper uses as its
+#'   STARTING VALUE. `"ml"` goes on to the constrained maximum likelihood of
+#'   Section 1, which is the paper's actual estimator. The closed form fits
+#'   excess returns and leaves yield levels unconstrained; the likelihood step
+#'   adds the restriction that factors extracted from the model's own fitted
+#'   yields equal the observed factors, and it is that which pins levels down.
+#'   It costs a minute or two.
+#' @param acmy_control Settings for the likelihood step; see [acmy_control()].
 #' @param fix_pi0 Hold the inflation intercept fixed instead of estimating
 #'   it. `TRUE` fixes it at the sample mean of realised inflation, a number
 #'   fixes it there (in monthly rate units), and `NULL` estimates it. The
@@ -131,9 +140,12 @@ atsm_real <- function(panel,
                       real_return_maturities = NULL,
                       short_rate = NULL,
                       short_rate_units = c("auto", "percent", "decimal"),
-                      fix_pi0 = NULL) {
+                      fix_pi0 = NULL,
+                      method = c("closed_form", "ml"),
+                      acmy_control = termpremia::acmy_control()) {
   inflation_units <- match.arg(inflation_units)
   short_rate_units <- match.arg(short_rate_units)
+  method <- match.arg(method)
 
   if (!inherits(panel, "yield_panel")) {
     stop("`panel` must be a yield_panel; see ?yield_panel.", call. = FALSE)
@@ -157,9 +169,11 @@ atsm_real <- function(panel,
   check_on_grid(maturities, grid_nom, nominal)
   check_on_grid(real_maturities, grid_real, real)
 
-  if (!1 %in% maturities) {
-    stop("The one-month nominal maturity is required as the short rate ",
-         "fallback. Include it in `maturities`.", call. = FALSE)
+  # Only the FALLBACK short rate needs it; see the same check in atsm().
+  if (is.null(short_rate) && !1 %in% maturities) {
+    stop("The one-month nominal maturity is required as the short rate, ",
+         "unless you supply one through `short_rate`. Include it in ",
+         "`maturities`, or pass `short_rate`.", call. = FALSE)
   }
 
   y_nom_all <- curve_matrix(panel, nominal)[, match(maturities, grid_nom),
@@ -213,8 +227,8 @@ atsm_real <- function(panel,
   rownames(x) <- format(dates)
 
   # --- returns -------------------------------------------------------------
-  r <- resolve_short_rate(short_rate, short_rate_units, dates,
-                          y_nom[, match(1L, maturities)])
+  fallback <- if (1 %in% maturities) y_nom[, match(1L, maturities)] else NULL
+  r <- resolve_short_rate(short_rate, short_rate_units, dates, fallback)
 
   return_maturities <- return_maturities %||%
     intersect(c(6L, 12L, seq(24L, 120L, by = 12L)), maturities)
@@ -229,6 +243,27 @@ atsm_real <- function(panel,
   n_max <- max(maturities, real_maturities)
   pars <- acmy_closed_form(x, rx_nom, rx_real, infl, r,
                            real_return_maturities, n_max, fix_pi0)
+
+  # The closed form is the paper's starting value, not its estimator. The
+  # likelihood step adds the constraints that tie fitted yields to the
+  # observed factors, which is what pins levels rather than only returns.
+  if (method == "ml") {
+    pars <- acmy_maximum_likelihood(
+      pars, x, rx_nom, rx_real, infl, r, fac, maturities, real_maturities,
+      return_maturities, real_return_maturities, n_max, acmy_control,
+      fix_pi0
+    )
+    if (!pars$ml$converged) {
+      warning(
+        "The likelihood step did not drive the factor-consistency ",
+        "constraints to zero: the largest violation is ",
+        format(pars$ml$violation, digits = 3), " after ", pars$ml$rounds,
+        " round(s), against a tolerance of ", format(acmy_control$tol),
+        ". Raise `max_outer` or `max_inner` in acmy_control(). The reported ",
+        "fit is the least-violating point reached.", call. = FALSE
+      )
+    }
+  }
 
   rho_q <- spectral_radius(pars$phi_tilde)
   rho_p <- spectral_radius(pars$phi)
@@ -283,6 +318,7 @@ atsm_real <- function(panel,
   structure(
     list(
       pricing = "acmy",
+      method = method,
       n_factors = ncol(x),
       n_factors_nominal = n_factors_nominal,
       n_factors_real = n_factors_real,
@@ -699,6 +735,12 @@ print.atsm_real_fit <- function(x, ...) {
   cat("  model      : ACMY joint real-nominal (", x$n_factors, " factors: ",
       x$n_factors_nominal, " nominal + ", x$n_factors_real, " real",
       if (x$has_liquidity) " + liquidity" else "", ")\n", sep = "")
+  cat("  estimator  : ",
+      if (identical(x$method, "ml")) {
+        "constrained maximum likelihood"
+      } else {
+        "closed form (the paper's starting value, not its estimator)"
+      }, "\n", sep = "")
   cat("  curves     : ", x$curves[["nominal"]], " (nominal) + ",
       x$curves[["real"]], " (real)\n", sep = "")
   cat("  sample     : ", length(x$dates), " ", x$frequency, " obs, ",
@@ -734,6 +776,16 @@ print.atsm_real_fit <- function(x, ...) {
         "liquidity\n               premium is absorbed into the inflation ",
         "risk premium\n", sep = "")
   }
+  if (!is.null(x$pars$ml)) {
+    m <- x$pars$ml
+    cat("  constraints: ", m$n_constraints, " factor-consistency restrictions ",
+        "on ", m$n_parameters, " parameters\n", sep = "")
+    cat("               largest violation ",
+        sprintf("%.3g", m$violation_start), " -> ",
+        sprintf("%.3g", m$violation), " over ", m$rounds, " round(s)",
+        if (m$converged) "" else " (NOT converged)", "\n", sep = "")
+  }
+
   if (!x$pars$inflation_fit$converged) {
     cat("  warning    : the inflation loadings did not converge (optim code ",
         x$pars$inflation_fit$convergence, ")\n", sep = "")

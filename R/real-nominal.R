@@ -581,3 +581,87 @@ sigma_e_whitener <- function(sigma_e) {
     if (is.matrix(m)) forwardsolve(lower, m) else drop(forwardsolve(lower, m))
   }
 }
+
+
+# Constrained maximum likelihood -------------------------------------------
+
+#' Rebuild the pricing factors from MODEL-IMPLIED yields
+#'
+#' The factors are principal components of observed yields. Nothing in the
+#' closed-form estimator makes the same construction applied to the model's
+#' own fitted yields give the same answer, and in general it does not. The
+#' maximum likelihood step of Supplementary Appendix Section 1 imposes that it
+#' does, and this function is the quantity being constrained.
+#'
+#' Everything about the construction is held at what the observed data
+#' produced -- the loadings, the centres, the orthogonalising regression's
+#' coefficients and the scaling. Only the yields change. That is what makes
+#' this a restriction on the model rather than a redefinition of the factors.
+#'
+#' The liquidity block is excluded from the result because it is observed
+#' rather than extracted, so it maps to itself and is not a restriction on
+#' anything.
+#'
+#' @param coefs Output of `acmy_coefficients()` under the pricing measure.
+#' @param fac Output of `acmy_factors()`.
+#' @param maturities,real_maturities The two maturity grids.
+#' @param x A `T x k` matrix of factors, in the scaled units `fac$x` uses.
+#'
+#' @return A `T x (k_nominal + k_real)` matrix.
+#' @keywords internal
+#' @noRd
+acmy_implied_factors <- function(coefs, fac, maturities, real_maturities, x) {
+  # The orthogonalising regression was run on UNSCALED components and on the
+  # raw liquidity series, so the probe has to be put back into those units
+  # before it can be fed through the same pipeline.
+  x_raw <- sweep(x, 2L, fac$scale, "*")
+
+  y_nom <- acmy_yields(coefs$a, coefs$b, x, maturities)
+  y_real <- acmy_yields(coefs$a_real, coefs$b_real, x, real_maturities)
+
+  x_nom <- sweep(y_nom, 2L, fac$nominal$center, "-") %*% fac$nominal$loadings
+
+  z <- cbind(1, x_nom)
+  if (!is.na(fac$liq_index)) z <- cbind(z, x_raw[, fac$liq_index])
+
+  resid <- y_real - z %*% fac$ortho_coef
+  x_real <- sweep(resid, 2L, fac$real$center, "-") %*% fac$real$loadings
+
+  out <- cbind(x_nom, x_real)
+  sweep(out, 2L, fac$scale[seq_len(ncol(out))], "/")
+}
+
+#' The factor-consistency constraints, read off numerically
+#'
+#' The map from factors to model-implied factors is affine, so it is pinned
+#' down by its value at zero and at each unit vector. Evaluating it there
+#' gives the intercept and the matrix exactly, and the constraint is that the
+#' intercept vanishes and the matrix is the selection that picks out the
+#' extracted blocks.
+#'
+#' This is the paper's `G1 A = g1` and `G2 B = g2` in a different dress.
+#' Deriving those by hand means pushing the loadings, the two centres, the
+#' orthogonalising coefficients and the factor scaling through the recursion
+#' on paper, and an algebra slip there would be invisible -- the constraints
+#' would simply be the wrong ones and the fit would come out worse for no
+#' apparent reason. Probing a function that is already covered by tests costs
+#' `k + 1` evaluations and cannot be wrong in that way.
+#'
+#' @inheritParams acmy_implied_factors
+#' @param k Number of factors.
+#' @param kk Number of *extracted* factors, `k_nominal + k_real`.
+#'
+#' @return A numeric vector of constraint violations, zero when satisfied.
+#' @keywords internal
+#' @noRd
+acmy_constraints <- function(coefs, fac, maturities, real_maturities, k, kk) {
+  probe <- rbind(rep(0, k), diag(k))
+  implied <- acmy_implied_factors(coefs, fac, maturities, real_maturities,
+                                  probe)
+
+  intercept <- implied[1L, ]
+  slope <- t(implied[-1L, , drop = FALSE]) - intercept   # kk x k, column j
+  target <- diag(k)[seq_len(kk), , drop = FALSE]
+
+  c(intercept, as.vector(slope - target))
+}
