@@ -87,7 +87,7 @@ implementations of *different* term structure models.
 `vignette("validation")` reproduces this and then investigates the part that
 does **not** match: a residual ~15bp level difference, which the vignette
 localises entirely to the risk-neutral component and traces to the choice of
-short rate. A validation that reports only the agreement is marketing.
+short rate. 
 
 ## Stability and scope
 
