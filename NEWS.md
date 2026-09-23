@@ -54,6 +54,19 @@ change before the first CRAN submission. Pin a commit if you build on it.
 * `svensson_curve()` and `svensson_yield()` evaluate Nelson-Siegel and Svensson
   parameters onto any maturity grid, verified against the Fed's own published
   tenors to 5e-05.
+* `svensson_fit()` is their inverse: it fits a Nelson-Siegel or Svensson curve
+  to each date of a panel observed at only a handful of tenors, and
+  `predict()` evaluates it on the monthly grid ACM needs. Decays are estimated
+  per date by a grid search refined from its best three local minima.
+  Refining from the best cell alone missed narrow basins and doubled the error
+  in the premium. Rebuilding the Bank of England curve from eight tenors moves
+  its 10-year term premium by 4bp on average (0.999 correlation in monthly
+  changes); see `analysis/validate-svensson-fit.R`. `yield_type` has no
+  default and par yields are refused, because standard-tenor data is often
+  par. A hold-out check drops each interior tenor, refits and predicts it,
+  giving an upper bound on the error between tenors.
+* `yield_panel()` accepts an `extrapolated` column, and `predict()` on a curve
+  fit always sets one, marking maturities outside each date's observed range.
 
 ## Diagnostics
 
@@ -62,6 +75,13 @@ change before the first CRAN submission. Pin a commit if you build on it.
   order 1e267 with no error raised.
 * `atsm()` reports when model-implied expected short rates breach the lower
   bound. Fitted on US data spanning the ZLB, the model reaches −3.15%.
+* `atsm()` and `atsm_real()` refuse more factors than a curve contains. A
+  curve rebuilt with fixed Nelson-Siegel decays varies along exactly three
+  directions; five factors used to fail deep inside the return regressions
+  with `singular matrix 'a' in solve`.
+* `atsm()` and `atsm_real()` warn when their default short rate, the one-month
+  yield, is flagged as extrapolated. Rebuilt from a three-month shortest
+  tenor, it missed the true yield by up to 20–260bp in single months.
 * `term_premium_survey()` gives a model-free benchmark from survey
   expectations. It returns one row per survey date and never silently
   interpolates.

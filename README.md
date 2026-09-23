@@ -74,6 +74,27 @@ If you hold Nelson-Siegel or Svensson parameters rather than yields (as
 published by the Fed, Bundesbank, and others), `svensson_curve()` evaluates
 them onto whatever maturity grid you need.
 
+More often you hold yields at a handful of tenors, and the model needs a
+monthly grid: each one-month return needs maturities `n` and `n − 1`.
+`svensson_fit()` fits a curve on every date and `predict()` puts it back on the
+grid, flagging every maturity outside the observed range:
+
+```r
+fit <- svensson_fit(my_panel, yield_type = "zero")  # par yields are refused
+fit                                                 # fit and hold-out check
+dense <- predict(fit, maturities = 1:120)
+
+atsm(dense, n_factors = 5, short_rate = my_bill_rate)
+```
+
+Rebuilding the Bank of England curve from eight tenors this way moves its
+10-year term premium by 4bp on average, with a 0.999 correlation in monthly
+changes ([`analysis/validate-svensson-fit.R`](analysis/validate-svensson-fit.R)).
+Two things to know. First, the one-month yield below your shortest tenor is an
+extrapolation, which is why `atsm()` warns if you leave it as the short rate.
+Second, fixing the decay parameters, as Diebold–Li do, limits the curve to
+three or four factors, and `atsm()` refuses more.
+
 ## Forwards, and why you probably want them
 
 A ten-year spot rate mixes the next five years with the five after that. The
@@ -193,8 +214,8 @@ on it, pin a commit. Breaking changes will be noted in `NEWS.md`.
 In scope: ACM estimation; Bauer-Rudebusch-Wu bias correction; survey-augmented
 dynamics; the joint real-nominal decomposition; term premia by tenor,
 risk-neutral yields, expected short-rate paths, expected excess returns,
-forward rates and their decomposition; multiple curves; a model-free survey
-benchmark.
+forward rates and their decomposition; multiple curves; rebuilding a monthly
+curve from a few zero-coupon tenors; a model-free survey benchmark.
 
 Not in scope: fitting curves from bond prices, shadow-rate models, joint
 multi-country (GVAR) estimation, credit, derivatives.

@@ -19,15 +19,24 @@
 #' signed so that its largest-magnitude loading is positive, which is
 #' deterministic and independent of the numerical path taken.
 #'
+#' A panel can have fewer independent directions of variation than it has
+#' maturities. A curve rebuilt from a Nelson-Siegel model with fixed decays is
+#' the common case: every date is a combination of the same three loadings, so
+#' components beyond the third are rounding noise. Asking for more factors
+#' than that is refused here, because downstream it surfaces only as a
+#' singular matrix deep inside the return regressions.
+#'
 #' @param y A `T x N` numeric matrix of yields, dates in rows.
 #' @param k Number of components to retain.
+#' @param arg,what How to name the factor count and the panel in the error
+#'   raised when `k` exceeds the panel's rank.
 #'
 #' @return A list with `scores` (`T x k`), `loadings` (`N x k`), `center`
 #'   (length `N`) and `sdev` (length `k`).
 #'
 #' @keywords internal
 #' @noRd
-acm_factors <- function(y, k) {
+acm_factors <- function(y, k, arg = "k", what = "the yield curve") {
   if (anyNA(y)) {
     stop("Yield matrix contains missing values; ACM needs a complete panel.",
          call. = FALSE)
@@ -40,6 +49,25 @@ acm_factors <- function(y, k) {
   yc <- sweep(y, 2L, center, "-")
 
   sv <- svd(yc, nu = 0, nv = k)
+
+  # Genuine higher components of a yield curve are small but not tiny: the
+  # fifth of the US curve has a singular value about 3e-3 of the first. A
+  # rank-deficient panel's are at rounding level, about 1e-15. The threshold
+  # sits far from both.
+  rank <- sum(sv$d > sv$d[1L] * 1e-8)
+  if (k > rank) {
+    stop(
+      "`", arg, " = ", k, "` asks for more factors than ", what, " contains: ",
+      "its yields move along only ", rank, " independent direction(s), so ",
+      "any further factor is rounding noise and its price of risk cannot be ",
+      "estimated. A curve rebuilt from a Nelson-Siegel or Svensson model with ",
+      "FIXED decays looks exactly like this -- every date combines the same ",
+      "three or four loadings. Use `", arg, " <= ", rank, "`, or rebuild the ",
+      "curve with estimated decays; see ?svensson_fit.",
+      call. = FALSE
+    )
+  }
+
   loadings <- sv$v
   sdev <- sv$d[seq_len(k)] / sqrt(max(nrow(y) - 1L, 1L))
 

@@ -55,6 +55,11 @@ yield_panel <- function(x, ...) {
 #'   `"swap"`, `"tips"` or `"other"`.
 #' @param issuer Free-text issuer or market label, for example `"US"` or
 #'   `"DE"`. Recycled or named like `instrument`.
+#' @param extrapolated Optional name of a logical column marking yields that
+#'   lie outside the maturities actually observed on that date, such as the
+#'   `extrapolated` column of [gsw_monthly] or [boe_yield_curve()]. [atsm()]
+#'   reads it to warn when its default short rate is an extrapolation.
+#'   [predict.svensson_fit()] sets it for you.
 #'
 #' @export
 yield_panel.data.frame <- function(x,
@@ -66,11 +71,12 @@ yield_panel.data.frame <- function(x,
                                    maturity_unit = c("months", "years"),
                                    instrument = "government",
                                    issuer = NA_character_,
+                                   extrapolated = NULL,
                                    ...) {
   units <- match.arg(units)
   maturity_unit <- match.arg(maturity_unit)
 
-  needed <- c(date, maturity, yield, curve)
+  needed <- c(date, maturity, yield, curve, extrapolated)
   missing_cols <- setdiff(needed, names(x))
   if (length(missing_cols)) {
     stop("`x` is missing column(s): ", paste(missing_cols, collapse = ", "),
@@ -94,6 +100,15 @@ yield_panel.data.frame <- function(x,
     date = dates, maturity = mats, yield = yld, curve = curve_id,
     stringsAsFactors = FALSE
   )
+
+  if (!is.null(extrapolated)) {
+    flag <- x[[extrapolated]]
+    if (!is.logical(flag) || anyNA(flag)) {
+      stop("`", extrapolated, "` must be a logical column with no NA.",
+           call. = FALSE)
+    }
+    long$extrapolated <- flag
+  }
 
   dup <- duplicated(long[, c("date", "maturity", "curve")])
   if (any(dup)) {
@@ -186,6 +201,9 @@ new_yield_panel_from_long <- function(long, instrument, issuer) {
 
   curves <- list()
   maturities <- list()
+  # Extrapolation flags, when supplied, are kept as a parallel logical matrix
+  # per curve. A cell with no row in `long` is missing, not extrapolated.
+  flags <- if ("extrapolated" %in% names(long)) list()
 
   for (nm in curve_names) {
     sub <- long[long$curve == nm, , drop = FALSE]
@@ -196,10 +214,17 @@ new_yield_panel_from_long <- function(long, instrument, issuer) {
       nrow = length(dates), ncol = length(mats),
       dimnames = list(as.character(dates), as.character(mats))
     )
-    m[cbind(match(sub$date, dates), match(sub$maturity, mats))] <- sub$yield
+    cell <- cbind(match(sub$date, dates), match(sub$maturity, mats))
+    m[cell] <- sub$yield
 
     curves[[nm]] <- m
     maturities[[nm]] <- mats
+
+    if (!is.null(flags)) {
+      f <- matrix(FALSE, nrow(m), ncol(m), dimnames = dimnames(m))
+      f[cell] <- sub$extrapolated
+      flags[[nm]] <- f
+    }
   }
 
   structure(
@@ -208,7 +233,8 @@ new_yield_panel_from_long <- function(long, instrument, issuer) {
       dates = dates,
       maturities = maturities,
       meta = meta,
-      frequency = detect_frequency(dates)
+      frequency = detect_frequency(dates),
+      extrapolated = flags
     ),
     class = "yield_panel"
   )
@@ -373,12 +399,15 @@ print.yield_panel <- function(x, ...) {
     m <- x$curves[[nm]]
     pct_na <- 100 * mean(is.na(m))
 
+    flags <- x$extrapolated[[nm]]
     cat(sprintf(
-      "    %-12s %s%s  maturities %g-%gm (n=%d)  missing %.1f%%\n",
+      "    %-12s %s%s  maturities %g-%gm (n=%d)  missing %.1f%%%s\n",
       nm,
       x$meta$instrument[i],
       if (is.na(x$meta$issuer[i])) "" else paste0("/", x$meta$issuer[i]),
-      min(mats), max(mats), length(mats), pct_na
+      min(mats), max(mats), length(mats), pct_na,
+      if (is.null(flags)) "" else
+        sprintf("  extrapolated %.1f%%", 100 * mean(flags))
     ))
   }
 

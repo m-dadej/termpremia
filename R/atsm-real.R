@@ -229,6 +229,7 @@ atsm_real <- function(panel,
   # --- returns -------------------------------------------------------------
   fallback <- if (1 %in% maturities) y_nom[, match(1L, maturities)] else NULL
   r <- resolve_short_rate(short_rate, short_rate_units, dates, fallback)
+  if (is.null(short_rate)) warn_extrapolated_short_rate(panel, nominal, keep)
 
   return_maturities <- return_maturities %||%
     intersect(c(6L, 12L, seq(24L, 120L, by = 12L)), maturities)

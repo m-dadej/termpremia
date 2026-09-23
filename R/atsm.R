@@ -206,12 +206,13 @@ atsm <- function(panel,
   p <- -sweep(y, 2L, maturities, "*")
   colnames(p) <- as.character(maturities)
 
-  fac <- acm_factors(y, k = n_factors)
+  fac <- acm_factors(y, k = n_factors, arg = "n_factors")
   x <- fac$scores
   rownames(x) <- rownames(y)
 
   fallback <- if (1 %in% maturities) y[, match(1L, maturities)] else NULL
   r <- resolve_short_rate(short_rate, short_rate_units, panel$dates, fallback)
+  if (is.null(short_rate)) warn_extrapolated_short_rate(panel, curve)
   rx <- acm_excess_returns(p, maturities, return_maturities, r)
 
   pars <- acm_three_step(x, rx, r)
@@ -343,6 +344,42 @@ resolve_short_rate <- function(short_rate, units, dates, default) {
   }
 
   sr_val[idx] / 12   # annualised decimal -> monthly units
+}
+
+#' Warn when the default short rate is an extrapolated yield
+#'
+#' Only possible when the panel carries extrapolation flags, which
+#' [predict.svensson_fit()] always sets and `yield_panel()` sets on request.
+#' The one-month yield is the default short rate, so every excess return in
+#' the estimation is measured against it; rebuilt from a shortest tenor of
+#' three months, it missed the true one by up to 20-260bp in single months on
+#' US and UK data.
+#'
+#' @param panel A `yield_panel`.
+#' @param curve Curve supplying the short rate.
+#' @param rows Optional row indices of the dates actually used.
+#' @return `TRUE`, invisibly, when it warned.
+#' @keywords internal
+#' @noRd
+warn_extrapolated_short_rate <- function(panel, curve, rows = NULL) {
+  flags <- panel$extrapolated[[curve]]
+  j <- match(1, panel$maturities[[curve]])
+  if (is.null(flags) || is.na(j)) return(invisible(FALSE))
+
+  f <- flags[, j]
+  if (!is.null(rows)) f <- f[rows]
+  if (!any(f)) return(invisible(FALSE))
+
+  warning(
+    "The short rate is the one-month yield of curve '", curve, "', which is ",
+    "extrapolated -- shorter than any maturity observed that date -- on ",
+    sum(f), " of ", length(f), " dates. Every excess return the model is ",
+    "estimated on is measured against it, and an extrapolated short end can ",
+    "sit tens of basis points away from any traded rate. Supply an observed ",
+    "bill or policy rate through `short_rate`.",
+    call. = FALSE
+  )
+  invisible(TRUE)
 }
 
 #' Check model-implied expected short rates against the lower bound

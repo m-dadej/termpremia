@@ -18,6 +18,7 @@ yield_panel(x, ...)
   maturity_unit = c("months", "years"),
   instrument = "government",
   issuer = NA_character_,
+  extrapolated = NULL,
   ...
 )
 
@@ -55,6 +56,12 @@ character vector keyed by curve name. One of \code{"government"}, \code{"ois"},
 
 \item{issuer}{Free-text issuer or market label, for example \code{"US"} or
 \code{"DE"}. Recycled or named like \code{instrument}.}
+
+\item{extrapolated}{Optional name of a logical column marking yields that
+lie outside the maturities actually observed on that date, such as the
+\code{extrapolated} column of \link{gsw_monthly} or \code{\link[=boe_yield_curve]{boe_yield_curve()}}. \code{\link[=atsm]{atsm()}}
+reads it to warn when its default short rate is an extrapolation.
+\code{\link[=predict.svensson_fit]{predict.svensson_fit()}} sets it for you.}
 
 \item{dates}{A \code{Date} vector of length \code{nrow(x)}. If \code{NULL}, taken from
 \code{rownames(x)}.}

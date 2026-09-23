@@ -215,7 +215,8 @@ acmy_factors <- function(y_nom, y_real, k_nominal, k_real, liquidity = NULL) {
          "complete panel on both curves.", call. = FALSE)
   }
 
-  nominal <- acm_factors(y_nom, k = k_nominal)
+  nominal <- acm_factors(y_nom, k = k_nominal, arg = "n_factors_nominal",
+                         what = "the nominal curve")
   x_nom <- nominal$scores
 
   z <- cbind(1, x_nom)
@@ -224,7 +225,9 @@ acmy_factors <- function(y_nom, y_real, k_nominal, k_real, liquidity = NULL) {
   ortho_coef <- qr.solve(z, y_real)
   resid_real <- y_real - z %*% ortho_coef
 
-  real <- acm_factors(resid_real, k = k_real)
+  real <- acm_factors(resid_real, k = k_real, arg = "n_factors_real",
+                      what = paste("the real curve, once the nominal factors",
+                                   "are projected out,"))
 
   x <- cbind(x_nom, real$scores)
   colnames(x) <- c(sprintf("N%d", seq_len(k_nominal)),

@@ -6,7 +6,7 @@
 \alias{termpremia-package}
 \title{termpremia: Term Premium Decomposition from Zero-Coupon Yield Curves}
 \description{
-Estimates Gaussian affine term structure models and decomposes zero-coupon government bond yields into expected average future short rates and a term premium. Implements the three-step regression estimator of Adrian, Crump and Moench (2013), together with a model-free survey-based benchmark. Accepts any zero-coupon yield curve and reports term premia, risk-neutral yields, expected short-rate paths and expected excess returns.
+Estimates Gaussian affine term structure models and decomposes zero-coupon government bond yields into expected average future short rates and a term premium. Implements the three-step regression estimator of Adrian, Crump and Moench (2013), together with a model-free survey-based benchmark. Accepts any zero-coupon yield curve and reports term premia, risk-neutral yields, expected short-rate paths, expected excess returns and forward-rate decompositions.
 }
 \author{
 \strong{Maintainer}: Mateusz Dadej \email{mateuszdadej@gmail.com}
