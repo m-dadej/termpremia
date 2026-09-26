@@ -42,49 +42,8 @@ N_FACTORS   <- 5L        # their stated specification
 MATURITIES  <- 1:120     # months; 120 = the 10y horizon they publish
 HORIZON     <- 120L
 MAKE_PLOT   <- TRUE
+library(termpremia)
 
-# --- load the package ----------------------------------------------------
-
-# Works whether the package is installed, or run from the package root, or run
-# from the parent directory, or sourced from anywhere else.
-find_pkg_root <- function() {
-  candidates <- c(".", "..", "termpremia", file.path("..", "termpremia"))
-
-  # When run via Rscript, R knows the script's own path, and the package root
-  # is its parent -- the most reliable candidate, so try it first.
-  file_arg <- grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)
-  if (length(file_arg)) {
-    script_dir <- dirname(sub("^--file=", "", file_arg[1]))
-    candidates <- c(file.path(script_dir, ".."), script_dir, candidates)
-  }
-
-  for (path in candidates) {
-    desc <- file.path(path, "DESCRIPTION")
-    if (file.exists(desc) &&
-        any(grepl("^Package:\\s*termpremia", readLines(desc, warn = FALSE)))) {
-      return(normalizePath(path))
-    }
-  }
-  NULL
-}
-
-if (requireNamespace("termpremia", quietly = TRUE)) {
-  library(termpremia)
-} else {
-  root <- find_pkg_root()
-  if (is.null(root)) {
-    stop(
-      "Could not locate the termpremia package source.\n",
-      "  Run from the package root:  Rscript analysis/replicate-poland.R\n",
-      "  or install the package:      devtools::install()\n",
-      "  (working directory is currently ", normalizePath("."), ")",
-      call. = FALSE
-    )
-  }
-  pkgload::load_all(root, quiet = TRUE)
-}
-
-stopifnot(file.exists(CURVE_CSV), file.exists(TP_CSV))
 
 # --- read ----------------------------------------------------------------
 
@@ -94,7 +53,6 @@ theirs <- read.csv(TP_CSV, stringsAsFactors = FALSE)
 # Exported as M/D/YYYY, which as.Date() will not parse without a format.
 curve$date <- as.Date(curve$date, format = "%m/%d/%Y")
 theirs$date <- as.Date(theirs$date, format = "%m/%d/%Y")
-stopifnot(!anyNA(curve$date), !anyNA(theirs$date))
 
 needed <- c("beta0_pct", "beta1_pct", "beta2_pct", "beta3_pct",
             "tau1_years", "tau2_years")
