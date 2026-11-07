@@ -1,6 +1,6 @@
-# Fitting Nelson-Siegel and Svensson curves to a handful of observed zero
-# yields, so that a curve published only at standard tenors can be put on the
-# monthly maturity grid ACM needs. svensson_curve() is the evaluation half;
+# Fitting Nelson-Siegel and Svensson curves to a handful of observed zero or
+# par yields, so that a curve published only at standard tenors can be put on
+# the monthly maturity grid ACM needs. svensson_curve() is the evaluation half;
 # this file is its inverse.
 #
 # Units. The fit runs on yields in BASIS POINTS internally, so that sums of
@@ -8,13 +8,14 @@
 # relative tolerances mean something. Parameters are converted back to
 # decimals, the package's canonical unit, on the way out.
 
-#' Fit Nelson-Siegel or Svensson curves to sparse zero-coupon yields
+#' Fit Nelson-Siegel or Svensson curves to sparse zero-coupon or par yields
 #'
-#' Fits a Nelson-Siegel or Svensson curve to the observed zero-coupon yields on
-#' every date of a [yield_panel], so that a curve published at a handful of
-#' tenors can be evaluated on the dense monthly grid that [atsm()] needs. The
-#' fitted curves are evaluated with `predict()`, which returns a new
-#' `yield_panel` that marks extrapolated maturities.
+#' Fits a Nelson-Siegel or Svensson zero-coupon curve to the yields observed on
+#' every date of a [yield_panel] -- zero-coupon yields, or the par yields of
+#' coupon bonds -- so that a curve published at a handful of tenors can be
+#' evaluated on the dense monthly grid that [atsm()] needs. The fitted curves
+#' are evaluated with `predict()`, which returns a new `yield_panel` of
+#' zero-coupon yields that marks extrapolated maturities.
 #'
 #' @section Why this is needed:
 #' ACM forms one-month holding returns, which need yields at maturities `n` and
@@ -89,16 +90,57 @@
 #' reported.
 #'
 #' @section Par yields:
-#' Yields quoted at standard tenors are very often par yields -- US
-#' constant-maturity Treasury yields, and most vendor generic series -- which
-#' are not zero-coupon yields and cannot be told apart from them by
-#' inspection. Treating one as the other biases the fitted curve, and the
-#' bias grows with maturity and with the slope of the curve. `yield_type`
-#' therefore has no default, and only `"zero"` is accepted.
+#' Yields quoted at standard tenors are very often par yields -- benchmark
+#' government bond yields, swap rates, US constant-maturity Treasury yields
+#' and most vendor generic series -- which are not zero-coupon yields and
+#' cannot be told apart from them by inspection. Treating one as the other
+#' biases the fitted curve, and the bias grows with maturity and with the
+#' slope of the curve. `yield_type` therefore has no default.
+#'
+#' With `yield_type = "par"` the curve is fitted to the par yields themselves.
+#' On every date the zero-coupon curve is chosen so that bonds paying
+#' `coupon_frequency` coupons a year, priced off it, have par yields as close
+#' as possible to the observed ones, in least squares. A par bond maturing in
+#' `n` years pays coupons at `n`, `n - 1/f`, `n - 2/f` and so on back to the
+#' first date after today, that first period being short when `n` is not a
+#' whole number of coupon periods, and its par yield is the coupon that prices
+#' it at par. A tenor no longer than one coupon period pays a single cash
+#' flow, so its par yield is the simple money-market yield: money-market rates
+#' and bills at the short end of a coupon curve need no separate treatment.
+#'
+#' Two things are not modelled. Day counts: maturities and accrual periods
+#' are measured in months divided by twelve, so a money-market rate quoted on
+#' an actual/360 basis should be scaled by 365/360 first. And the coupon
+#' effect: a benchmark bond's yield to maturity is a par yield only when the
+#' bond trades at par. Away from par the error grows with the gap between its
+#' coupon and its yield; for a bond near par it is a small fraction of the
+#' error made by treating the yield as zero-coupon.
+#'
+#' The decay search is the zero-yield one, run on par yields converted to
+#' zero yields through the current curve, and its result is then refined
+#' against the par yields directly. A par fit therefore takes several times
+#' as long as a zero fit -- about five times for Svensson -- and the hold-out
+#' check multiplies that again. The `rmse` in [coef()] and the hold-out check
+#' measure errors in par yields, the quantity fitted.
+#'
+#' Rebuilt this way from eight semi-annual par yields, the US and UK curves
+#' come back within 0.0 and 0.3bp of the originals between tenors (Svensson),
+#' and the 10-year ACM term premium within 0.0 and 4.9bp on average, about
+#' what fitting their true zero yields achieves. Taking the same par yields
+#' for zero yields misses the curves by 14 and 7bp and moves the US premium
+#' by up to 92bp. See `analysis/validate-svensson-fit.R`.
 #'
 #' @param panel A [yield_panel]. Every curve in it is fitted.
-#' @param yield_type What the yields are. Must be supplied; only `"zero"` is
-#'   supported. See the section on par yields.
+#' @param yield_type What the yields are: `"zero"` for zero-coupon yields, or
+#'   `"par"` for the par yields of coupon bonds. Must be supplied; see the
+#'   section on par yields. One value for every curve, or a named vector keyed
+#'   by curve name.
+#' @param coupon_frequency Coupons a year paid by the bonds whose par yields
+#'   are supplied: 1, 2, 4 or 12. Required for par yields, which are quoted at
+#'   this compounding frequency, so it cannot be inferred from them: 1 for
+#'   annual coupons (Bunds, most central European government bonds), 2 for
+#'   semi-annual (US Treasuries, gilts). Ignored for zero-coupon yields. One
+#'   value, or a named vector keyed by curve name.
 #' @param model `"auto"`, `"svensson"` or `"nelson_siegel"`.
 #' @param tau Optional fixed decays, in years: one value for Nelson-Siegel,
 #'   two for Svensson. `NULL`, the default, estimates them on every date.
@@ -137,9 +179,31 @@
 #' dense <- predict(fit, maturities = 1:120)
 #' dense
 #'
+#' \donttest{
+#' # Benchmark bond yields are par yields. Here, money-market rates at 3m and
+#' # 6m and annual-coupon par yields from 1y, as on most European curves.
+#' params <- data.frame(beta0 = 0.05, beta1 = -0.02, beta2 = 0.01,
+#'                      beta3 = 0, tau1 = 2, tau2 = NA)
+#' tenors <- c(3, 6, 12, 24, 36, 60, 84, 120)
+#' zero_at <- function(m) drop(svensson_curve(params, m / 12))
+#' par <- vapply(tenors, function(n) {
+#'   pay <- rev(seq(n, 1e-9, by = -12))           # coupon dates, in months
+#'   d <- exp(-zero_at(pay) * pay / 12)
+#'   (1 - d[length(d)]) / sum(diff(c(0, pay)) / 12 * d)
+#' }, numeric(1))
+#' bench <- yield_panel(matrix(par, 1, dimnames = list("2024-01-31", tenors)),
+#'                      units = "decimal", maturity_unit = "months")
+#'
+#' fit_par <- svensson_fit(bench, yield_type = "par", coupon_frequency = 1,
+#'                         check = FALSE)
+#' # Zero-coupon yields again: the 10-year point matches the true curve
+#' curve_matrix(predict(fit_par, maturities = 120)) - zero_at(120)
+#' }
+#'
 #' @export
 svensson_fit <- function(panel,
                          yield_type,
+                         coupon_frequency = NULL,
                          model = c("auto", "svensson", "nelson_siegel"),
                          tau = NULL,
                          tau_range = c(0.1, 30),
@@ -148,28 +212,24 @@ svensson_fit <- function(panel,
     stop("`panel` must be a yield_panel; see ?yield_panel.", call. = FALSE)
   }
   if (missing(yield_type)) {
-    stop("Declare what the yields are with `yield_type = \"zero\"`. Yields ",
-         "published at a handful of standard tenors are often PAR yields ",
-         "(US constant-maturity Treasury yields, most vendor generic series), ",
-         "and par and zero-coupon yields cannot be told apart from the ",
-         "numbers. See ?svensson_fit.", call. = FALSE)
+    stop("Declare what the yields are: `yield_type = \"zero\"` for ",
+         "zero-coupon yields, or `yield_type = \"par\"` for par yields. ",
+         "Yields published at a handful of standard tenors are often PAR ",
+         "yields (benchmark bond yields, swap rates, US constant-maturity ",
+         "Treasury yields, most vendor generic series), and par and ",
+         "zero-coupon yields cannot be told apart from the numbers. See ",
+         "?svensson_fit.", call. = FALSE)
   }
-  yield_type <- match.arg(yield_type, c("zero", "par"))
-  if (yield_type == "par") {
-    stop("Par yields are not supported. Fitting a zero-coupon curve through ",
-         "par yields as though they were zero-coupon yields biases it, and ",
-         "the bias grows with maturity and with the slope of the curve. ",
-         "Convert them to zero-coupon yields first, or use a published ",
-         "zero-coupon curve.", call. = FALSE)
-  }
+  curves <- stats::setNames(nm = panel$meta$curve)
+  yield_type <- check_yield_type(yield_type, curves)
+  freq <- check_coupon_frequency(coupon_frequency, yield_type, curves)
   model <- match.arg(model)
   tau_range <- check_tau_range(tau_range)
   tau <- check_fixed_tau(tau, model)
 
-  curves <- stats::setNames(nm = panel$meta$curve)
   fits <- lapply(curves, function(nm) {
     fit_one_curve(curve_matrix(panel, nm), panel$maturities[[nm]], nm,
-                  model, tau, tau_range, check)
+                  model, tau, tau_range, check, freq[[nm]])
   })
 
   for (nm in curves) {
@@ -200,6 +260,75 @@ svensson_fit <- function(panel,
 
 
 # Argument checks ---------------------------------------------------------
+
+#' One value per curve, from a scalar, a vector in curve order, or a vector
+#' named by curve
+#'
+#' @param need Curves that must have an entry when `v` is named. The others
+#'   come back `NA`.
+#' @keywords internal
+#' @noRd
+per_curve <- function(v, curves, arg, need = curves) {
+  if (!is.null(names(v))) {
+    missing_curves <- setdiff(need, names(v))
+    if (length(missing_curves)) {
+      stop("`", arg, "` is named but has no entry for curve(s): ",
+           paste(missing_curves, collapse = ", "), call. = FALSE)
+    }
+    return(stats::setNames(unname(v[match(curves, names(v))]), curves))
+  }
+  if (length(v) == 1L) return(stats::setNames(rep(v, length(curves)), curves))
+  if (length(v) == length(curves)) return(stats::setNames(v, curves))
+  stop("`", arg, "` must be length 1, length ", length(curves), ", or a named ",
+       "vector keyed by curve name.", call. = FALSE)
+}
+
+#' @keywords internal
+#' @noRd
+check_yield_type <- function(yield_type, curves) {
+  msg <- "`yield_type` must be \"zero\" or \"par\"."
+  if (!is.character(yield_type) || !length(yield_type)) {
+    stop(msg, call. = FALSE)
+  }
+  out <- per_curve(yield_type, curves, "yield_type")
+  if (anyNA(out) || !all(out %in% c("zero", "par"))) stop(msg, call. = FALSE)
+  out
+}
+
+#' Coupon frequency of each par curve
+#'
+#' @return A list named by curve: the frequency for par curves, `NULL` for
+#'   zero curves, which is what the fitting code takes to mean zero yields.
+#' @keywords internal
+#' @noRd
+check_coupon_frequency <- function(coupon_frequency, yield_type, curves) {
+  out <- stats::setNames(vector("list", length(curves)), curves)
+  par_curves <- curves[yield_type == "par"]
+
+  if (!length(par_curves)) {
+    if (!is.null(coupon_frequency)) {
+      warning("`coupon_frequency` was supplied but no curve has ",
+              "`yield_type = \"par\"`, so it was ignored.", call. = FALSE)
+    }
+    return(out)
+  }
+  if (is.null(coupon_frequency)) {
+    stop("Par yields need `coupon_frequency`, the number of coupons a year ",
+         "paid by the bonds they describe: 1 for annual coupons (Bunds, most ",
+         "central European government bonds), 2 for semi-annual (US ",
+         "Treasuries, gilts). It sets the compounding of a par yield, so it ",
+         "cannot be inferred from the numbers.", call. = FALSE)
+  }
+
+  msg <- "`coupon_frequency` must be 1, 2, 4 or 12 coupons a year."
+  if (!is.numeric(coupon_frequency)) stop(msg, call. = FALSE)
+  f <- per_curve(coupon_frequency, curves, "coupon_frequency",
+                 need = par_curves)[par_curves]
+  if (anyNA(f) || !all(f %in% c(1, 2, 4, 12))) stop(msg, call. = FALSE)
+
+  out[par_curves] <- as.list(as.numeric(f))
+  out
+}
 
 #' @keywords internal
 #' @noRd
@@ -245,16 +374,19 @@ check_fixed_tau <- function(tau, model) {
 #'
 #' @param y `T x N` decimal yields, `NA` where unobserved.
 #' @param maturities Maturities in months, matching the columns of `y`.
+#' @param freq Coupons a year when `y` holds par yields; `NULL` for zero
+#'   yields.
 #' @return A list describing the fit; see the fields assembled at the end.
 #' @keywords internal
 #' @noRd
-fit_one_curve <- function(y, maturities, name, model, tau, tau_range, check) {
+fit_one_curve <- function(y, maturities, name, model, tau, tau_range, check,
+                          freq = NULL) {
   n_obs <- rowSums(!is.na(y))
   model <- resolve_curve_model(model, tau, n_obs, name)
   min_obs <- curve_min_obs(model, tau)
 
   params <- curve_params(y * 1e4, maturities / 12, model, tau, tau_range,
-                         min_obs)
+                         min_obs, freq)
   # Dates with no observations at all are not failures -- a TIPS curve that
   # starts decades after its nominal partner has hundreds -- only dates that
   # had yields but too few of them.
@@ -268,6 +400,8 @@ fit_one_curve <- function(y, maturities, name, model, tau, tau_range, check) {
 
   list(
     model = model,
+    yield_type = if (is.null(freq)) "zero" else "par",
+    coupon_frequency = freq,
     tau = tau,
     params = params,
     maturities = maturities,
@@ -277,7 +411,7 @@ fit_one_curve <- function(y, maturities, name, model, tau, tau_range, check) {
     min_obs = min_obs,
     dropped = dropped,
     check = if (isTRUE(check)) {
-      holdout_check(y, maturities, model, tau, tau_range, min_obs)
+      holdout_check(y, maturities, model, tau, tau_range, min_obs, freq)
     }
   )
 }
@@ -360,11 +494,13 @@ pattern_ssr <- function(y, x) {
 #'
 #' @param y `T x N` yields in basis points.
 #' @param m Maturities in years.
+#' @param freq Coupons a year when `y` holds par yields; `NULL` for zero
+#'   yields.
 #' @return A `T x 7` matrix: `beta0`-`beta3` and `rmse` in decimals, `tau1`
 #'   and `tau2` in years. Unfittable dates are `NA`.
 #' @keywords internal
 #' @noRd
-curve_params <- function(y, m, model, tau, tau_range, min_obs) {
+curve_params <- function(y, m, model, tau, tau_range, min_obs, freq = NULL) {
   out <- matrix(NA_real_, nrow(y), 7L, dimnames = list(
     rownames(y), c("beta0", "beta1", "beta2", "beta3", "tau1", "tau2", "rmse")
   ))
@@ -376,8 +512,12 @@ curve_params <- function(y, m, model, tau, tau_range, min_obs) {
     rows <- which(key == k)
     cols <- which(obs[rows[1L], ])
     if (length(cols) < min_obs) next
-    out[rows, ] <- fit_pattern(y[rows, cols, drop = FALSE], m[cols], model,
-                               tau, tau_range)
+    out[rows, ] <- if (is.null(freq)) {
+      fit_pattern(y[rows, cols, drop = FALSE], m[cols], model, tau, tau_range)
+    } else {
+      fit_pattern_par(y[rows, cols, drop = FALSE], m[cols], model, tau,
+                      tau_range, freq)
+    }
   }
   out
 }
@@ -550,14 +690,275 @@ curve_evaluate <- function(params, m) {
                                           "tau1", "tau2"), drop = FALSE]), m)
 }
 
+
+# Par yields --------------------------------------------------------------
+#
+# A par yield is not a point on the zero curve but a summary of it: the coupon
+# that prices a bond at par, which depends on every discount factor up to the
+# bond's maturity. The curve is therefore fitted by pricing those bonds off
+# it. Given the decays the betas are no longer linear, because discount
+# factors are exponential in them, but they are very nearly so -- a par yield
+# sits a smooth few tens of basis points at most from the zero yield of the
+# same maturity -- and Gauss-Newton converges in a few steps from the fit that
+# treats par yields as zero yields.
+#
+# The decay search stays the zero-yield one. Its grid is what protects the fit
+# from the narrow basins described above, and the grid needs linear betas to
+# be cheap. So it is run on PSEUDO-ZERO yields: the observed par yields plus
+# the current curve's zero-minus-par spread at each tenor, which are exact
+# zero yields once the curve is right. The search is repeated with the spread
+# of the latest curve until the spread stops moving, which on smooth curves
+# takes two rounds, and the decays it settles on are then refined against the
+# par yields themselves.
+
+#' Cash flows of a par bond at each tenor
+#'
+#' Coupon dates run back from maturity in steps of one coupon period to the
+#' first date after today; the first period is short when the maturity is not
+#' a whole number of periods. Computed in months, where a coupon period is a
+#' whole number, so that coupon dates shared by several tenors coincide
+#' exactly.
+#'
+#' @param m Maturities in years.
+#' @param freq Coupons a year.
+#' @return A list: `times`, the distinct cash-flow times in years; `w`, an
+#'   `N x K` matrix holding each tenor's accrual fraction at each of its
+#'   cash-flow times and zero elsewhere; and `final`, the column of each
+#'   tenor's maturity.
+#' @keywords internal
+#' @noRd
+par_schedule <- function(m, freq) {
+  period <- 12 / freq
+  flows <- lapply(m * 12, function(n) {
+    # The tolerance keeps a maturity that is a whole number of periods, up to
+    # rounding, from growing a spurious stub of a few nanoseconds.
+    k <- ceiling(n / period - 1e-6) - 1
+    rev(n - (0:k) * period)
+  })
+  key <- function(x) round(x, 6)
+  times <- sort(unique(key(unlist(flows))))
+
+  w <- matrix(0, length(m), length(times))
+  final <- integer(length(m))
+  for (i in seq_along(flows)) {
+    j <- match(key(flows[[i]]), times)
+    w[i, j] <- diff(c(0, flows[[i]])) / 12
+    final[i] <- j[length(j)]
+  }
+  list(times = times / 12, w = w, final = final)
+}
+
+#' Par yields from zero-coupon yields at the cash-flow times
+#'
+#' @param z Continuously compounded decimal zero yields at `sched$times`: a
+#'   vector, or a matrix with one date per row.
+#' @return A matrix of decimal par yields, one row per date and one column per
+#'   tenor of `sched`.
+#' @keywords internal
+#' @noRd
+par_price <- function(z, sched) {
+  if (!is.matrix(z)) z <- matrix(z, nrow = 1L)
+  d <- exp(-sweep(z, 2L, sched$times, "*"))
+  unname((1 - d[, sched$final, drop = FALSE]) / (d %*% t(sched$w)))
+}
+
+#' Par yields of fitted parameters, one row per date
+#' @keywords internal
+#' @noRd
+par_evaluate <- function(params, sched) {
+  par_price(curve_evaluate(params, sched$times), sched)
+}
+
+#' Betas that fit par yields given the decays, by Gauss-Newton
+#'
+#' The default start is the linear fit that treats the par yields as zero
+#' yields, which is already within a few tens of basis points; `start`, the
+#' betas of nearby decays, is used instead when it fits better. Steps that
+#' would raise the sum of squares are halved, and an aliased column -- only
+#' possible with two nearly equal Svensson decays -- gets no step, as in
+#' `fit_pattern()`.
+#'
+#' @param obs Decimal par yields at tenors `m` (years).
+#' @param taus One decay (Nelson-Siegel) or two (Svensson), in years.
+#' @param start Optional starting betas.
+#' @return A list with `beta`, `resid` (decimal) and `ssr` (basis points
+#'   squared).
+#' @keywords internal
+#' @noRd
+par_betas <- function(obs, m, sched, taus, start = NULL, max_iter = 20L) {
+  tau2 <- if (length(taus) == 2L) taus[2L]
+  xc <- curve_design(sched$times, taus[1L], tau2)
+  tt <- sched$times
+
+  price <- function(beta) {
+    d <- exp(-drop(xc %*% beta) * tt)
+    a <- drop(sched$w %*% d)
+    p <- (1 - d[sched$final]) / a
+    list(beta = beta, d = d, a = a, p = p, ssr = sum((obs - p)^2))
+  }
+
+  beta <- qr.coef(qr(curve_design(m, taus[1L], tau2)), obs)
+  beta[is.na(beta)] <- 0
+  cur <- price(beta)
+  if (!is.null(start)) {
+    warm <- price(start)
+    if (is.finite(warm$ssr) && (!is.finite(cur$ssr) || warm$ssr < cur$ssr)) {
+      cur <- warm
+    }
+  }
+
+  for (it in seq_len(max_iter)) {
+    if (!is.finite(cur$ssr)) break
+    # d p / d beta, from p = (1 - d_n) / a and d d_t / d beta = -t d_t x_t.
+    dd <- -(tt * cur$d) * xc
+    jac <- (-dd[sched$final, , drop = FALSE] -
+              cur$p * (sched$w %*% dd)) / cur$a
+    step <- qr.coef(qr(jac), obs - cur$p)
+    step[is.na(step)] <- 0
+
+    h <- 1
+    new <- price(cur$beta + step)
+    while ((!is.finite(new$ssr) || new$ssr > cur$ssr) && h > 1e-4) {
+      h <- h / 2
+      new <- price(cur$beta + h * step)
+    }
+    if (!is.finite(new$ssr) || new$ssr > cur$ssr) break
+    cur <- new
+    # Converged once the step no longer moves any fitted par yield by more
+    # than 1e-6bp. Measured on yields rather than betas, because two nearly
+    # equal Svensson decays leave the betas free to drift along a direction
+    # the curve does not see.
+    if (max(abs(h * (jac %*% step))) < 1e-10) break
+  }
+
+  resid <- obs - cur$p
+  list(beta = cur$beta, resid = resid, ssr = sum((resid * 1e4)^2))
+}
+
+#' Fit one date's par yields at given decays, optionally refining the decays
+#'
+#' With `refine = TRUE` the decays move within the basin the search chose, by
+#' at most `width` in log terms, to where the par yields themselves fit best.
+#' The proposal is kept if nothing does better.
+#'
+#' @return A list with `row`, the date's seven parameters as in
+#'   `curve_params()`, and `ssr` in basis points squared.
+#' @keywords internal
+#' @noRd
+par_refine <- function(obs, m, sched, taus, refine, tau_range, width = 0.2) {
+  best <- par_betas(obs, m, sched, taus)
+  best_taus <- taus
+
+  if (refine) {
+    lt <- log(taus)
+    lower <- pmax(lt - width, log(tau_range[1L]))
+    upper <- pmin(lt + width, log(tau_range[2L]))
+    # Each evaluation starts Gauss-Newton from the betas of the last, whose
+    # decays the optimiser has only just left, which roughly halves the
+    # iterations it takes.
+    last <- best$beta
+    f <- function(l) {
+      s <- par_betas(obs, m, sched, exp(l), start = last)
+      if (is.finite(s$ssr)) last <<- s$beta
+      if (is.finite(s$ssr)) s$ssr else 1e30
+    }
+    cand <- if (length(lt) == 2L) {
+      stats::optim(lt, f, method = "L-BFGS-B", lower = lower, upper = upper,
+                   control = list(factr = 1e10))$par
+    } else {
+      stats::optimize(f, c(lower, upper))$minimum
+    }
+    refined <- par_betas(obs, m, sched, exp(cand), start = last)
+    if (refined$ssr < best$ssr) {
+      best <- refined
+      best_taus <- exp(cand)
+    }
+  }
+
+  sv <- length(taus) == 2L
+  list(
+    row = c(if (sv) best$beta else c(best$beta, 0), best_taus[1L],
+            if (sv) best_taus[2L] else NA_real_, sqrt(mean(best$resid^2))),
+    ssr = best$ssr
+  )
+}
+
+#' Fit a group of dates that share observed maturities, from par yields
+#'
+#' @param y `G x N` par yields in basis points.
+#' @param m Maturities in years.
+#' @param tol Change in the pseudo-zero yields, in basis points, below which
+#'   another round of the decay search would not move the result.
+#' @keywords internal
+#' @noRd
+fit_pattern_par <- function(y, m, model, tau, tau_range, freq,
+                            max_rounds = 3L, tol = 0.01) {
+  sv <- model == "svensson"
+  sched <- par_schedule(m, freq)
+  obs <- y / 1e4
+  n <- nrow(y)
+
+  out <- matrix(NA_real_, n, 7L, dimnames = list(NULL, c(
+    "beta0", "beta1", "beta2", "beta3", "tau1", "tau2", "rmse"
+  )))
+  best_ssr <- rep(Inf, n)
+  keep_better <- function(i, r) {
+    if (r$ssr < best_ssr[i]) {
+      out[i, ] <<- r$row
+      best_ssr[i] <<- r$ssr
+    }
+  }
+
+  # Fixed decays leave nothing to search: the betas are directly the least
+  # squares fit to the par yields.
+  if (!is.null(tau)) {
+    for (i in seq_len(n)) {
+      keep_better(i, par_refine(obs[i, ], m, sched, tau, FALSE, tau_range))
+    }
+    return(out)
+  }
+
+  # The rounds only have to choose the basin, so the betas are solved at the
+  # proposed decays and the decays are left alone; refining them against the
+  # par yields happens once, from the best proposal, at the end.
+  pseudo <- y   # the first round treats the par yields as zero yields
+  for (round in seq_len(max_rounds)) {
+    taus <- if (sv) {
+      search_svensson(pseudo, m, tau_range)
+    } else {
+      matrix(search_nelson_siegel(pseudo, m, tau_range), ncol = 1L)
+    }
+    for (i in seq_len(n)) {
+      keep_better(i, par_refine(obs[i, ], m, sched, taus[i, ], FALSE,
+                                tau_range))
+    }
+
+    spread <- (curve_evaluate(out, m) - par_evaluate(out, sched)) * 1e4
+    moved <- max(abs(y + spread - pseudo))
+    pseudo <- y + spread
+    if (moved < tol) break
+  }
+
+  tau_cols <- if (sv) c("tau1", "tau2") else "tau1"
+  for (i in seq_len(n)) {
+    keep_better(i, par_refine(obs[i, ], m, sched, out[i, tau_cols], TRUE,
+                              tau_range))
+  }
+  out
+}
+
 #' Drop each interior tenor, refit, and predict it
+#'
+#' For par yields the prediction is the held-out tenor's par yield, priced off
+#' the refitted curve, so the error is in the quantity that was observed.
 #'
 #' @return A data frame with one row per interior tenor: `maturity` (months),
 #'   `n_dates`, and `rmse` and `max_abs` in decimals. `NULL` when there is no
 #'   interior tenor or no tenor can be dropped without leaving too few.
 #' @keywords internal
 #' @noRd
-holdout_check <- function(y, maturities, model, tau, tau_range, min_obs) {
+holdout_check <- function(y, maturities, model, tau, tau_range, min_obs,
+                          freq = NULL) {
   ord <- sort(maturities)
   inner <- ord[-c(1L, length(ord))]
   if (!length(inner)) return(NULL)
@@ -565,8 +966,13 @@ holdout_check <- function(y, maturities, model, tau, tau_range, min_obs) {
   rows <- lapply(inner, function(h) {
     j <- match(h, maturities)
     p <- curve_params(y[, -j, drop = FALSE] * 1e4, maturities[-j] / 12,
-                      model, tau, tau_range, min_obs)
-    err <- drop(curve_evaluate(p, h / 12)) - y[, j]
+                      model, tau, tau_range, min_obs, freq)
+    predicted <- if (is.null(freq)) {
+      curve_evaluate(p, h / 12)
+    } else {
+      par_evaluate(p, par_schedule(h / 12, freq))
+    }
+    err <- drop(predicted) - y[, j]
     ok <- !is.na(err)
     data.frame(
       maturity = h,
@@ -590,8 +996,10 @@ holdout_check <- function(y, maturities, model, tau, tau_range, min_obs) {
 #'   every curve; a named list sets each curve's grid separately.
 #' @param ... Unused.
 #'
-#' @return A [yield_panel] with the same dates, curves, instruments and
-#'   issuers as the panel that was fitted. Maturities outside the observed
+#' @return A [yield_panel] of continuously compounded zero-coupon yields --
+#'   also when the curve was fitted to par yields -- with the same dates,
+#'   curves, instruments and issuers as the panel that was fitted. Maturities
+#'   outside the observed
 #'   range on each date are flagged as extrapolated, which [atsm()] reads.
 #'   Dates that could not be fitted are kept as missing rows rather than
 #'   dropped, so that a gap cannot pass unnoticed into the factor VAR.
@@ -697,6 +1105,13 @@ print.svensson_fit <- function(x, ...) {
           paste0("fixed at ", paste(format(cf$tau), collapse = " and "),
                  " years")
         }, "\n", sep = "")
+    par <- identical(cf$yield_type, "par")
+    cat("    yields     : ", if (par) {
+      paste0("par, ", coupon_label(cf$coupon_frequency), " coupons -- ",
+             "fitted by pricing par bonds off the curve")
+    } else {
+      "zero-coupon"
+    }, "\n", sep = "")
     cat("    tenors     : ", length(cf$maturities), " (",
         paste(sort(cf$maturities), collapse = ", "), " months)\n",
         sep = "")
@@ -704,7 +1119,7 @@ print.svensson_fit <- function(x, ...) {
       worst <- which.max(p[, "rmse"])
       cat("    fit        : RMSE median ", bp(stats::median(p[ok, "rmse"])),
           ", worst ", bp(p[worst, "rmse"]), " on ",
-          format(x$dates[worst]), "\n", sep = "")
+          format(x$dates[worst]), if (par) ", in par yields", "\n", sep = "")
     }
     if (is.null(cf$tau) && any(ok)) {
       cat("    decays     : tau1 median ",
@@ -737,4 +1152,11 @@ print.svensson_fit <- function(x, ...) {
     }
   }
   invisible(x)
+}
+
+#' @keywords internal
+#' @noRd
+coupon_label <- function(freq) {
+  switch(as.character(freq), "1" = "annual", "2" = "semi-annual",
+         "4" = "quarterly", "12" = "monthly", paste(freq, "a year"))
 }

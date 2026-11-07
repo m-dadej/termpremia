@@ -2,11 +2,12 @@
 % Please edit documentation in R/svensson-fit.R
 \name{svensson_fit}
 \alias{svensson_fit}
-\title{Fit Nelson-Siegel or Svensson curves to sparse zero-coupon yields}
+\title{Fit Nelson-Siegel or Svensson curves to sparse zero-coupon or par yields}
 \usage{
 svensson_fit(
   panel,
   yield_type,
+  coupon_frequency = NULL,
   model = c("auto", "svensson", "nelson_siegel"),
   tau = NULL,
   tau_range = c(0.1, 30),
@@ -16,8 +17,17 @@ svensson_fit(
 \arguments{
 \item{panel}{A \link{yield_panel}. Every curve in it is fitted.}
 
-\item{yield_type}{What the yields are. Must be supplied; only \code{"zero"} is
-supported. See the section on par yields.}
+\item{yield_type}{What the yields are: \code{"zero"} for zero-coupon yields, or
+\code{"par"} for the par yields of coupon bonds. Must be supplied; see the
+section on par yields. One value for every curve, or a named vector keyed
+by curve name.}
+
+\item{coupon_frequency}{Coupons a year paid by the bonds whose par yields
+are supplied: 1, 2, 4 or 12. Required for par yields, which are quoted at
+this compounding frequency, so it cannot be inferred from them: 1 for
+annual coupons (Bunds, most central European government bonds), 2 for
+semi-annual (US Treasuries, gilts). Ignored for zero-coupon yields. One
+value, or a named vector keyed by curve name.}
 
 \item{model}{\code{"auto"}, \code{"svensson"} or \code{"nelson_siegel"}.}
 
@@ -35,11 +45,12 @@ on a maturity grid, \code{coef()} for the parameters, and \code{print()} for fit
 and hold-out diagnostics.
 }
 \description{
-Fits a Nelson-Siegel or Svensson curve to the observed zero-coupon yields on
-every date of a \link{yield_panel}, so that a curve published at a handful of
-tenors can be evaluated on the dense monthly grid that \code{\link[=atsm]{atsm()}} needs. The
-fitted curves are evaluated with \code{predict()}, which returns a new
-\code{yield_panel} that marks extrapolated maturities.
+Fits a Nelson-Siegel or Svensson zero-coupon curve to the yields observed on
+every date of a \link{yield_panel} -- zero-coupon yields, or the par yields of
+coupon bonds -- so that a curve published at a handful of tenors can be
+evaluated on the dense monthly grid that \code{\link[=atsm]{atsm()}} needs. The fitted curves
+are evaluated with \code{predict()}, which returns a new \code{yield_panel} of
+zero-coupon yields that marks extrapolated maturities.
 }
 \section{Why this is needed}{
 
@@ -127,12 +138,45 @@ reported.
 
 \section{Par yields}{
 
-Yields quoted at standard tenors are very often par yields -- US
-constant-maturity Treasury yields, and most vendor generic series -- which
-are not zero-coupon yields and cannot be told apart from them by
-inspection. Treating one as the other biases the fitted curve, and the
-bias grows with maturity and with the slope of the curve. \code{yield_type}
-therefore has no default, and only \code{"zero"} is accepted.
+Yields quoted at standard tenors are very often par yields -- benchmark
+government bond yields, swap rates, US constant-maturity Treasury yields
+and most vendor generic series -- which are not zero-coupon yields and
+cannot be told apart from them by inspection. Treating one as the other
+biases the fitted curve, and the bias grows with maturity and with the
+slope of the curve. \code{yield_type} therefore has no default.
+
+With \code{yield_type = "par"} the curve is fitted to the par yields themselves.
+On every date the zero-coupon curve is chosen so that bonds paying
+\code{coupon_frequency} coupons a year, priced off it, have par yields as close
+as possible to the observed ones, in least squares. A par bond maturing in
+\code{n} years pays coupons at \code{n}, \code{n - 1/f}, \code{n - 2/f} and so on back to the
+first date after today, that first period being short when \code{n} is not a
+whole number of coupon periods, and its par yield is the coupon that prices
+it at par. A tenor no longer than one coupon period pays a single cash
+flow, so its par yield is the simple money-market yield: money-market rates
+and bills at the short end of a coupon curve need no separate treatment.
+
+Two things are not modelled. Day counts: maturities and accrual periods
+are measured in months divided by twelve, so a money-market rate quoted on
+an actual/360 basis should be scaled by 365/360 first. And the coupon
+effect: a benchmark bond's yield to maturity is a par yield only when the
+bond trades at par. Away from par the error grows with the gap between its
+coupon and its yield; for a bond near par it is a small fraction of the
+error made by treating the yield as zero-coupon.
+
+The decay search is the zero-yield one, run on par yields converted to
+zero yields through the current curve, and its result is then refined
+against the par yields directly. A par fit therefore takes several times
+as long as a zero fit -- about five times for Svensson -- and the hold-out
+check multiplies that again. The \code{rmse} in \code{\link[=coef]{coef()}} and the hold-out check
+measure errors in par yields, the quantity fitted.
+
+Rebuilt this way from eight semi-annual par yields, the US and UK curves
+come back within 0.0 and 0.3bp of the originals between tenors (Svensson),
+and the 10-year ACM term premium within 0.0 and 4.9bp on average, about
+what fitting their true zero yields achieves. Taking the same par yields
+for zero yields misses the curves by 14 and 7bp and moves the US premium
+by up to 92bp. See \code{analysis/validate-svensson-fit.R}.
 }
 
 \examples{
@@ -149,6 +193,27 @@ fit
 # Back on a monthly grid, extrapolation below three months flagged
 dense <- predict(fit, maturities = 1:120)
 dense
+
+\donttest{
+# Benchmark bond yields are par yields. Here, money-market rates at 3m and
+# 6m and annual-coupon par yields from 1y, as on most European curves.
+params <- data.frame(beta0 = 0.05, beta1 = -0.02, beta2 = 0.01,
+                     beta3 = 0, tau1 = 2, tau2 = NA)
+tenors <- c(3, 6, 12, 24, 36, 60, 84, 120)
+zero_at <- function(m) drop(svensson_curve(params, m / 12))
+par <- vapply(tenors, function(n) {
+  pay <- rev(seq(n, 1e-9, by = -12))           # coupon dates, in months
+  d <- exp(-zero_at(pay) * pay / 12)
+  (1 - d[length(d)]) / sum(diff(c(0, pay)) / 12 * d)
+}, numeric(1))
+bench <- yield_panel(matrix(par, 1, dimnames = list("2024-01-31", tenors)),
+                     units = "decimal", maturity_unit = "months")
+
+fit_par <- svensson_fit(bench, yield_type = "par", coupon_frequency = 1,
+                        check = FALSE)
+# Zero-coupon yields again: the 10-year point matches the true curve
+curve_matrix(predict(fit_par, maturities = 120)) - zero_at(120)
+}
 
 }
 \references{

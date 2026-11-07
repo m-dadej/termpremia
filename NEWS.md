@@ -62,9 +62,20 @@ change before the first CRAN submission. Pin a commit if you build on it.
   in the premium. Rebuilding the Bank of England curve from eight tenors moves
   its 10-year term premium by 4bp on average (0.999 correlation in monthly
   changes); see `analysis/validate-svensson-fit.R`. `yield_type` has no
-  default and par yields are refused, because standard-tenor data is often
-  par. A hold-out check drops each interior tenor, refits and predicts it,
-  giving an upper bound on the error between tenors.
+  default, because standard-tenor data is often par. A hold-out check drops
+  each interior tenor, refits and predicts it, giving an upper bound on the
+  error between tenors.
+* `svensson_fit(yield_type = "par", coupon_frequency = )` fits the curve to
+  par yields -- benchmark bond yields, swap rates, constant-maturity series
+  -- by pricing par bonds off it, and `predict()` still returns zero-coupon
+  yields. Tenors of one coupon period or less are single cash flows, so
+  money-market rates at the short end fit alongside bond yields. Rebuilt
+  from eight par yields, the US and UK curves come back within 0.0 and 0.3bp
+  between tenors and the 10-year term premium within 0.0 and 4.9bp on
+  average; taking the same yields for zero yields moved the US premium by up
+  to 92bp. `coupon_frequency` has no default, since it sets the compounding
+  of the yields and cannot be read from them. Day counts and the coupon
+  effect of bonds trading away from par are not modelled.
 * `yield_panel()` accepts an `extrapolated` column, and `predict()` on a curve
   fit always sets one, marking maturities outside each date's observed range.
 

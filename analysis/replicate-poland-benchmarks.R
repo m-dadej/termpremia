@@ -48,10 +48,12 @@
 #
 # THE BENCHMARKS ARE COUPON YIELDS, DECLARED "zero" KNOWINGLY. ACM prices
 # zero-coupon bonds. Fitting the 2y-10y yields properly as annual-coupon par
-# yields, with the money-market rates made continuously compounded, matched
-# the site less well (0.921 on changes, against 0.943), perhaps because the
-# spreadsheet's quoting conventions are not the ones that fit assumed. For
-# scale: in a simulation on the site's curve, treating par yields as zero
+# yields -- `yield_type = "par", coupon_frequency = 1`, which takes the
+# money-market rates as single cash flows -- matched the site less well on
+# changes (0.921, against 0.943) and better on levels (0.996, against 0.993),
+# perhaps because the spreadsheet's quoting conventions are not the ones that
+# fit assumes, or because benchmark bonds away from par are not par bonds.
+# For scale: in a simulation on the site's curve, treating par yields as zero
 # yields moved this premium by +7.5bp on average, with a 10bp standard
 # deviation.
 #
@@ -61,7 +63,7 @@
 #   Svensson, all seven rates (the default)            0.835        14.0bp    +13.2bp
 #   Nelson-Siegel, all seven rates                     0.882        16.6bp     -5.8bp
 #   Nelson-Siegel, all but 1year                       0.908        17.2bp     -4.3bp
-#   2y-10y fitted as par yields (above)                0.921        13.8bp     -8.9bp
+#   fitted as annual-coupon par yields (above)         0.921        13.8bp     -8.9bp
 #   money-market rates at a quarter of the weight   0.875-0.889   15-17bp   -11 to -37bp
 #   1y-10y only, short end extrapolated                0.939         9.6bp    +62.8bp
 #

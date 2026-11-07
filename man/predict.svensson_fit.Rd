@@ -16,8 +16,10 @@ every curve; a named list sets each curve's grid separately.}
 \item{...}{Unused.}
 }
 \value{
-A \link{yield_panel} with the same dates, curves, instruments and
-issuers as the panel that was fitted. Maturities outside the observed
+A \link{yield_panel} of continuously compounded zero-coupon yields --
+also when the curve was fitted to par yields -- with the same dates,
+curves, instruments and issuers as the panel that was fitted. Maturities
+outside the observed
 range on each date are flagged as extrapolated, which \code{\link[=atsm]{atsm()}} reads.
 Dates that could not be fitted are kept as missing rows rather than
 dropped, so that a gap cannot pass unnoticed into the factor VAR.

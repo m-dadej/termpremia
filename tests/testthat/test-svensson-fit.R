@@ -24,11 +24,27 @@ sim_sparse <- function(tenors = standard_tenors, n = 24L, beta3 = TRUE,
   )
 }
 
+# Par yields priced off the same known parameters: what a benchmark bond or
+# swap curve would quote at those tenors.
+sim_par <- function(s, tenors = standard_tenors, freq = 1) {
+  sched <- par_schedule(tenors / 12, freq)
+  par <- par_price(svensson_curve(s$params, sched$times), sched)
+  yield_panel(par, dates = s$panel$dates, maturities = tenors,
+              units = "decimal", maturity_unit = "months")
+}
+
 # The last ten years of the US curve, observed only at the standard tenors.
 gsw_sparse <- function() {
   x <- gsw_monthly[gsw_monthly$maturity %in% standard_tenors &
                    gsw_monthly$date >= as.Date("2015-01-01"), ]
   yield_panel(x, units = "percent", maturity_unit = "months", issuer = "US")
+}
+
+as_long <- function(p, curve) {
+  y <- curve_matrix(p)
+  data.frame(date = rep(p$dates, ncol(y)),
+             maturity = rep(p$maturities[[1]], each = nrow(y)),
+             yield = as.vector(y), curve = curve)
 }
 
 warnings_from <- function(expr) {
@@ -107,6 +123,128 @@ test_that("a real curve is rebuilt from eight tenors to within a basis point", {
 })
 
 
+# Par yields --------------------------------------------------------------
+
+test_that("par yields of a flat curve match their closed forms", {
+  z <- 0.05
+  flat <- cbind(beta0 = z, beta1 = 0, beta2 = 0, beta3 = 0, tau1 = 1,
+                tau2 = NA)
+
+  # A par yield is quoted at its coupon frequency.
+  for (f in c(1, 2, 4, 12)) {
+    p <- drop(par_evaluate(flat, par_schedule(c(12, 60, 120) / 12, f)))
+    expect_equal(p, rep(f * (exp(z / f) - 1), 3), tolerance = 1e-12)
+  }
+
+  # One coupon period or less is a single cash flow: the simple yield.
+  n <- c(0.25, 0.5, 1)
+  p <- drop(par_evaluate(flat, par_schedule(n, 1)))
+  expect_equal(p, (exp(z * n) - 1) / n, tolerance = 1e-12)
+})
+
+test_that("a maturity off the coupon cycle starts with a short period", {
+  s <- par_schedule(c(18, 24) / 12, 1)
+  expect_equal(s$times, c(6, 12, 18, 24) / 12)
+  expect_equal(s$w[1, ], c(0.5, 0, 1, 0))
+  expect_equal(s$w[2, ], c(0, 1, 0, 1))
+  expect_equal(s$final, c(3L, 4L))
+})
+
+test_that("a Svensson curve is recovered from eight par yields", {
+  s <- sim_sparse()
+  truth <- svensson_curve(s$params, (1:120) / 12)
+
+  for (f in c(1, 2)) {
+    panel <- sim_par(s, freq = f)
+    fit <- svensson_fit(panel, yield_type = "par", coupon_frequency = f,
+                        check = FALSE)
+    expect_equal(fit$curves$yields$yield_type, "par")
+    dense <- curve_matrix(predict(fit, maturities = 1:120))
+    expect_lt(max(abs(dense - truth)), 1e-5)
+  }
+
+  # The same yields taken for zero-coupon yields: the error the par fit
+  # exists to remove, here over 10bp on a moderately sloped curve.
+  as_zero <- svensson_fit(sim_par(s), yield_type = "zero", check = FALSE)
+  dense <- curve_matrix(predict(as_zero, maturities = 1:120))
+  expect_gt(max(abs(dense - truth)), 1e-3)
+})
+
+test_that("a Nelson-Siegel curve is recovered from par yields", {
+  tenors <- c(3, 12, 24, 60, 120)
+  s <- sim_sparse(tenors = tenors, beta3 = FALSE)
+  fit <- svensson_fit(sim_par(s, tenors), yield_type = "par",
+                      coupon_frequency = 1, check = FALSE)
+  expect_equal(fit$curves$yields$model, "nelson_siegel")
+
+  dense <- curve_matrix(predict(fit, maturities = 3:120))
+  truth <- svensson_curve(s$params, (3:120) / 12)
+  expect_lt(max(abs(dense - truth)), 1e-6)
+})
+
+test_that("fixed decays fit par yields exactly", {
+  s <- sim_sparse(beta3 = FALSE)
+  s$params$tau1 <- 1.5
+  fit <- svensson_fit(sim_par(s, freq = 2), yield_type = "par",
+                      coupon_frequency = 2, tau = 1.5, check = FALSE)
+
+  p <- coef(fit)
+  expect_equal(p$beta0, s$params$beta0, tolerance = 1e-10)
+  expect_equal(p$beta1, s$params$beta1, tolerance = 1e-10)
+  expect_equal(p$beta2, s$params$beta2, tolerance = 1e-10)
+  expect_lt(max(p$rmse), 1e-12)
+})
+
+test_that("a real curve is rebuilt from eight par yields to within a basis point", {
+  truth <- gsw_monthly[gsw_monthly$date >= as.Date("2015-01-01"), ]
+  truth <- curve_matrix(yield_panel(truth, units = "percent",
+                                    maturity_unit = "months"))
+  sched <- par_schedule(standard_tenors / 12, 2)
+  par <- par_price(truth[, as.character(round(sched$times * 12))], sched)
+  dimnames(par) <- list(rownames(truth), standard_tenors)
+  panel <- yield_panel(par, units = "decimal", maturity_unit = "months")
+
+  fit <- svensson_fit(panel, yield_type = "par", coupon_frequency = 2,
+                      check = FALSE)
+  dense <- curve_matrix(predict(fit, maturities = 1:120))
+  between <- setdiff(3:120, standard_tenors)
+  expect_lt(sqrt(mean((dense - truth)[, between]^2)), 1e-4)
+})
+
+test_that("the hold-out check on par yields predicts par yields", {
+  s <- sim_sparse(n = 6L)
+  panel <- sim_par(s)
+  clean <- svensson_fit(panel, yield_type = "par",
+                        coupon_frequency = 1)$curves$yields$check
+  expect_equal(clean$maturity, c(6, 12, 24, 36, 60, 84))
+  expect_lt(max(clean$rmse), 1e-5)
+
+  panel$curves$yields[, "36"] <- panel$curves$yields[, "36"] + 0.005
+  bumped <- svensson_fit(panel, yield_type = "par",
+                         coupon_frequency = 1)$curves$yields$check
+  expect_gt(bumped$rmse[bumped$maturity == 36], 0.004)
+})
+
+test_that("yield types and coupon frequencies can differ by curve", {
+  a <- sim_sparse(seed = 1L)
+  b <- sim_sparse(seed = 2L)
+  long <- rbind(as_long(a$panel, "ois"), as_long(sim_par(b, freq = 2), "bonds"))
+  panel <- yield_panel(long, curve = "curve", units = "decimal")
+
+  fit <- svensson_fit(panel, yield_type = c(ois = "zero", bonds = "par"),
+                      coupon_frequency = c(bonds = 2), check = FALSE)
+  expect_equal(fit$curves$ois$yield_type, "zero")
+  expect_null(fit$curves$ois$coupon_frequency)
+  expect_equal(fit$curves$bonds$coupon_frequency, 2)
+
+  dense <- predict(fit, maturities = 1:120)
+  expect_lt(max(abs(curve_matrix(dense, "ois") -
+                      svensson_curve(a$params, (1:120) / 12))), 1e-5)
+  expect_lt(max(abs(curve_matrix(dense, "bonds") -
+                      svensson_curve(b$params, (1:120) / 12))), 1e-5)
+})
+
+
 # Model choice ------------------------------------------------------------
 
 test_that("auto chooses the model from the fewest tenors on any date", {
@@ -164,10 +302,19 @@ test_that("dates with no observations at all are not reported as failures", {
 
 # Arguments ---------------------------------------------------------------
 
-test_that("the yield type must be declared, and par yields are refused", {
+test_that("the yield type must be declared, and par yields need a frequency", {
   s <- sim_sparse(n = 3L)
+  fit <- function(...) svensson_fit(s$panel, check = FALSE, ...)
+
   expect_error(svensson_fit(s$panel), "yield_type = \"zero\"")
-  expect_error(svensson_fit(s$panel, yield_type = "par"), "Par yields")
+  expect_error(fit(yield_type = "coupon"), "\"zero\" or \"par\"")
+  expect_error(fit(yield_type = "par"), "need `coupon_frequency`")
+  expect_error(fit(yield_type = "par", coupon_frequency = 3), "1, 2, 4 or 12")
+  expect_error(fit(yield_type = "par", coupon_frequency = "1"),
+               "1, 2, 4 or 12")
+  expect_error(fit(yield_type = c(other = "par"), coupon_frequency = 1),
+               "no entry for curve")
+  expect_warning(fit(yield_type = "zero", coupon_frequency = 1), "ignored")
 })
 
 test_that("inconsistent decay arguments are refused", {
@@ -225,12 +372,6 @@ test_that("yield_panel carries an extrapolation column and validates it", {
 })
 
 test_that("several curves are fitted separately and keep their metadata", {
-  as_long <- function(p, curve) {
-    y <- curve_matrix(p)
-    data.frame(date = rep(p$dates, ncol(y)),
-               maturity = rep(p$maturities[[1]], each = nrow(y)),
-               yield = as.vector(y), curve = curve)
-  }
   a <- sim_sparse(seed = 1L)
   b <- sim_sparse(tenors = c(24, 36, 60, 84, 96, 108, 120), seed = 2L)
   long <- rbind(as_long(a$panel, "nominal"), as_long(b$panel, "real"))
@@ -274,6 +415,11 @@ test_that("print() reports the model, the fit and the check", {
     print(svensson_fit(s$panel, yield_type = "zero", tau = 1.5,
                        check = FALSE)),
     "at most 3"
+  )
+  expect_output(
+    print(svensson_fit(sim_par(s), yield_type = "par", coupon_frequency = 1,
+                       check = FALSE)),
+    "par, annual coupons.*in par yields"
   )
 })
 

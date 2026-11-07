@@ -4,8 +4,9 @@
 # Samples a known monthly curve at eight standard tenors -- 3m, 6m, 1y, 2y,
 # 3y, 5y, 7y, 10y -- rebuilds the monthly grid from them with svensson_fit(),
 # and asks how far the ACM decomposition moves compared with fitting the
-# original curve. Lives in analysis/ because the UK half reads a Bank of
-# England archive.
+# original curve. It does this twice: from the zero-coupon yields at those
+# tenors, and from the par yields a coupon bond would quote there. Lives in
+# analysis/ because the UK half reads a Bank of England archive.
 #
 # TWO CURVES, AND WHY THE SECOND ONE IS THE TEST. The US curve is GSW, which
 # IS a Svensson curve, so rebuilding it with Svensson is flattering: the model
@@ -69,6 +70,36 @@
 #    between grid points; refining the best three local minima halved the UK
 #    premium error (mean 8.6bp to 4.4bp, max 26bp to 13bp) and cut the worst
 #    UK one-month miss from 152bp to 57bp.
+#
+# PAR YIELDS. The same eight tenors priced as semi-annual par yields off the
+# original curve, as a benchmark bond or constant-maturity series would
+# quote them, rebuilt with `yield_type = "par"` and, for contrast, taken for
+# zero yields. Observed short rate supplied. Results as of November 2026:
+#
+#                            curve, between     10-year term premium
+#                            tenors, RMSE    corr, changes  mean |diff|  max |diff|
+#   US  Svensson, par            0.0bp          1.0000         0.0bp        1bp
+#   US  Svensson, as zero       13.6bp          0.9847        12.2bp       92bp
+#   US  Nelson-Siegel, par       2.2bp          0.9618         6.8bp       57bp
+#   US  Nelson-Siegel, as zero  13.9bp          0.9418        15.0bp      112bp
+#   UK  Svensson, par            0.3bp          0.9985         4.9bp       15bp
+#   UK  Svensson, as zero        7.2bp          0.9967         6.7bp       18bp
+#   UK  Nelson-Siegel, par       2.1bp          0.9932         5.2bp       24bp
+#   UK  Nelson-Siegel, as zero   7.2bp          0.9954        11.1bp       28bp
+#
+# 6. Fitted as par, the rebuild is about as good as one from the true zero
+#    yields -- compare the first table: 0.0 against 0.1bp mean on the US
+#    premium, 4.9 against 4.4bp on the UK's. Taken for zero yields, the same
+#    numbers miss the curve by 7
+#    to 14bp between tenors and move the US premium by up to 92bp: at ten
+#    years US par yields sit between 26bp below and 80bp above zero yields
+#    over the sample, the UK's within 20bp. The one exception is UK
+#    Nelson-Siegel on changes, where the shortcut scores 0.9954 against
+#    0.9932, with twice the mean error.
+#
+# 7. A Svensson par fit takes about five times as long as a zero fit, 20s
+#    against 4.5s on the 763 US months, from the second round of decay search
+#    and the refinement against par yields.
 #
 # Usage: Rscript analysis/validate-svensson-fit.R
 # =========================================================================
@@ -169,3 +200,50 @@ uk <- yield_panel(boe, units = "percent", maturity_unit = "months",
                   issuer = "GB")
 round_trip("UK, Bank of England (spline truth: the fair test)", uk,
            n_factors = 4)
+
+# --- Par yields ---------------------------------------------------------
+
+# The same tenors priced as par yields off the original curve -- what a
+# benchmark bond or a constant-maturity series quotes -- rebuilt as par, and
+# taken for zero yields, the shortcut the par fit replaces. Priced with the
+# package's internal pricer, the one svensson_fit() fits with. Gilts and
+# Treasuries both pay semi-annual coupons.
+par_round_trip <- function(name, truth, n_factors, freq = 2) {
+  y <- curve_matrix(truth)
+  sched <- par_schedule(TENORS / 12, freq)
+  par <- par_price(y[, as.character(round(sched$times * 12)), drop = FALSE],
+                   sched)
+  dimnames(par) <- list(rownames(y), TENORS)
+  sparse <- yield_panel(par, units = "decimal", maturity_unit = "months")
+  sr <- data.frame(date = truth$dates, value = y[, "1"])
+  off <- setdiff(min(TENORS):max(TENORS), TENORS)
+  gap <- par[, "120"] - y[, "120"]
+
+  cat("\n=== ", name, ", par yields: par minus zero at 10y from ",
+      bp(min(gap)), " to ", bp(max(gap)), "bp ===\n", sep = "")
+  rows <- list()
+  for (model in c("svensson", "nelson_siegel")) {
+    for (taken_as in c("par", "zero")) {
+      t0 <- Sys.time()
+      fit <- if (taken_as == "par") {
+        svensson_fit(sparse, yield_type = "par", coupon_frequency = freq,
+                     model = model, check = FALSE)
+      } else {
+        svensson_fit(sparse, yield_type = "zero", model = model,
+                     check = FALSE)
+      }
+      secs <- as.numeric(difftime(Sys.time(), t0, units = "secs"))
+      dense <- predict(fit, maturities = 1:120)
+      row <- compare(paste(model, "/ as", taken_as), truth, dense, n_factors,
+                     sr)
+      row$curve_rmse_bp <- bp(sqrt(mean((curve_matrix(dense) - y)[, off]^2)))
+      row$secs <- round(secs, 1)
+      rows[[length(rows) + 1]] <- row
+    }
+  }
+  cat("10-year term premium against the fit on the original curve:\n")
+  print(do.call(rbind, rows), row.names = FALSE)
+}
+
+par_round_trip("US", us, n_factors = 5)
+par_round_trip("UK", uk, n_factors = 4)

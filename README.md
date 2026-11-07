@@ -80,7 +80,7 @@ monthly grid: each one-month return needs maturities `n` and `n − 1`.
 grid, flagging every maturity outside the observed range:
 
 ```r
-fit <- svensson_fit(my_panel, yield_type = "zero")  # par yields are refused
+fit <- svensson_fit(my_panel, yield_type = "zero")  # no default: say which
 fit                                                 # fit and hold-out check
 dense <- predict(fit, maturities = 1:120)
 
@@ -94,6 +94,21 @@ Two things to know. First, the one-month yield below your shortest tenor is an
 extrapolation, which is why `atsm()` warns if you leave it as the short rate.
 Second, fixing the decay parameters, as Diebold–Li do, limits the curve to
 three or four factors, and `atsm()` refuses more.
+
+Benchmark bond yields and swap rates are usually *par* yields, not zero-coupon
+yields, and the two cannot be told apart from the numbers. Say so, with the
+coupon frequency, and the curve is fitted by pricing par bonds off it;
+`predict()` still returns zero-coupon yields. Money-market rates at the short
+end can sit in the same panel, because a tenor of one coupon period or less is
+a single cash flow:
+
+```r
+fit <- svensson_fit(my_benchmarks, yield_type = "par", coupon_frequency = 1)
+```
+
+Taking par yields for zero yields is not a small shortcut: rebuilt from eight
+of them, the US 10-year premium moves by up to 92bp, against 1bp when they are
+fitted as par.
 
 ## Forwards, and why you probably want them
 
