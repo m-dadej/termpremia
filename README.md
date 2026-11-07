@@ -238,27 +238,25 @@ multi-country (GVAR) estimation, credit, derivatives.
 On the roadmap: model comparison diagnostics and expanding-window
 re-estimation.
 
-## Licence and bundled data
+## Licence and data
 
-The package is MIT licensed. **The bundled datasets are not.** Each is governed
-by its own source's terms, recorded in
-[`LICENSE.note`](LICENSE.note) — read it before redistributing.
+The package is MIT licensed, and so is everything it ships. The two bundled
+datasets, `gsw_monthly` and `tbill_3m`, derive from Federal Reserve Board
+releases, which assert no copyright; their sources are recorded in
+[`LICENSE.note`](LICENSE.note).
 
-In particular, `acm_published` is redistributed under the New York Fed's Terms
-of Use, which require attribution, clear labelling of modifications, and that
-**the same permissions pass to anyone you pass the data to**:
+Everything else is fetched rather than bundled, either because its terms do not
+fit the package's licence or because the file is too large to carry:
+`acm_published()`, `gsw_tips()`, `fred_series()`, `spf_tbill()` and
+`spf_bill10()` for the US, `boe_yield_curve()` and `ons_rpi()` for the UK.
+
+In particular, `acm_published()` downloads the New York Fed's published ACM
+series, which is governed by the New York Fed's Terms of Use: they require
+attribution, clear labelling of modifications, and that **the same terms pass
+to anyone you pass the data to**. The attribution is attached to the result:
 
 > © Federal Reserve Bank of New York. Content from the New York Fed subject to
 > the Terms of Use at newyorkfed.org.
-
-`gsw_monthly` and `tbill_3m` derive from Federal Reserve Board releases, which
-assert no copyright.
-
-Everything else is fetched rather than bundled, either because its licence does
-not permit redistribution or because the file is too large to carry:
-`gsw_tips()`, `fred_series()`, `spf_tbill()` and `spf_bill10()` for the US,
-`boe_yield_curve()` and `ons_rpi()` for the UK. They all take a `cache` path,
-so a script need only download once.
 
 ## References
 

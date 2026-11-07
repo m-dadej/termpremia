@@ -7,11 +7,7 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r, include = FALSE}
-knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 7,
-                      fig.height = 4.2, dpi = 120)
-options(digits = 4)
-```
+
 
 A term premium estimate is only as trustworthy as the evidence that the code
 producing it is correct. The Federal Reserve Bank of New York publishes the
@@ -23,7 +19,16 @@ against loosely, but a specific series to be reproduced.
 This vignette reproduces it, then investigates what does not match and why.
 Both halves matter. A validation that reports only the agreement is marketing.
 
-```{r setup}
+The published series is downloaded, not bundled, so this vignette is
+precomputed: its output was generated when it was written, not when the package
+was built. It uses the New York Fed release downloaded on
+07 November 2026, with termpremia
+0.0.0.9000. The New York Fed revises its
+history at each update, so a fresh download can move the comparisons below in
+their last digit.
+
+
+``` r
 library(termpremia)
 
 panel <- yield_panel(gsw_monthly, units = "percent",
@@ -32,6 +37,14 @@ panel <- yield_panel(gsw_monthly, units = "percent",
 
 fit <- suppressWarnings(atsm(panel, n_factors = 5))
 fit
+#> <atsm_fit>
+#>   model      : ACM (5 factors, P-dynamics: ols)
+#>   curve      : yields [government/US]
+#>   sample     : 763 monthly obs, 1961-06-30 to 2024-12-31
+#>   maturities : 1-120 months (120)
+#>   fit        : 1.48 bp RMSE
+#>   10y term premium: mean 130 bp, last 29 bp
+#>   note       : expected short rates are negative in 0.4% of cells (min -3.15%); no lower bound is imposed
 ```
 
 Five factors and a 1–120 month grid, matching the published specification. The
@@ -40,25 +53,33 @@ reports a real problem with itself.
 
 ## The benchmark
 
-`acm_published` holds the New York Fed's own output. Its internal identity is
-worth checking first, because it is the identity our implementation must also
-satisfy:
+`acm_published()` downloads the New York Fed's own output. It is not bundled
+with the package because the New York Fed's terms of use, not the package's MIT
+licence, govern it. The sample is cut where `gsw_monthly` ends, so the two share
+a date index. The series' internal identity is worth checking first, because it
+is the identity our implementation must also satisfy:
 
-```{r}
-with(acm_published, max(abs(fitted - (risk_neutral + term_premium))))
+
+``` r
+acm <- acm_published(end = "2024-12-31")
+with(acm, max(abs(fitted - (risk_neutral + term_premium))))
+#> [1] 4.441e-16
 ```
 
 Exact to machine precision. Ours is too, by construction:
 
-```{r}
+
+``` r
 max(abs(fit$fitted - (fit$risk_neutral + fit$term_premium)))
+#> [1] 6.939e-18
 ```
 
 ## Headline comparison
 
-```{r}
+
+``` r
 mine <- term_premium(fit, maturity = 120)
-pub <- acm_published[acm_published$maturity == 120, c("date", "term_premium")]
+pub <- acm[acm$maturity == 120, c("date", "term_premium")]
 
 cmp <- merge(mine, pub, by = "date")
 cmp$mine_bp <- cmp$value * 1e4
@@ -69,26 +90,22 @@ c(observations = nrow(cmp),
   corr_changes = cor(diff(cmp$mine_bp), diff(cmp$pub_bp)),
   mean_mine    = mean(cmp$mine_bp),
   mean_published = mean(cmp$pub_bp))
+#>   observations    corr_levels   corr_changes      mean_mine mean_published 
+#>       763.0000         0.9997         0.9935       129.7121       144.7220
 ```
 
 Correlation of 0.9997 in levels and 0.9935 in monthly changes, across all 763
 month-ends. For scale, Cohen, Hördahl and Xia (2018) report change correlations
 of 0.77–0.92 between published implementations of *different* models.
 
-```{r, echo = FALSE}
-plot(cmp$date, cmp$pub_bp, type = "l", lwd = 2, col = "grey40",
-     xlab = "", ylab = "basis points",
-     main = "US 10-year term premium")
-lines(cmp$date, cmp$mine_bp, lwd = 1.4, col = "firebrick")
-abline(h = 0, col = "grey85", lty = 2)
-legend("topright", c("NY Fed published", "termpremia"),
-       col = c("grey40", "firebrick"), lwd = c(2, 1.4), bty = "n", cex = 0.85)
-```
+<img src="figures/validation-headline-plot-1.png" alt="Line chart of the US 10-year term premium, 1961 to 2024: the New York Fed's published series and this package's estimate track each other almost exactly."  />
 
 The model also fits the curve itself closely:
 
-```{r}
+
+``` r
 sqrt(mean((fit$observed - fit$fitted)^2)) * 1e4  # RMSE, basis points
+#> [1] 1.478
 ```
 
 ## Where the remaining difference lives
@@ -97,9 +114,10 @@ The mean levels differ by about 15bp. Because the New York Fed publishes the
 *components*, not just the premium, that gap can be localised rather than
 guessed at.
 
-```{r}
+
+``` r
 idx <- match(120, fit$maturities)
-pub10 <- acm_published[acm_published$maturity == 120, ]
+pub10 <- acm[acm$maturity == 120, ]
 
 data.frame(
   component = c("fitted yield", "risk-neutral", "term premium"),
@@ -113,6 +131,10 @@ data.frame(
     mean(abs(fit$term_premium[, idx] * 100 - pub10$term_premium))
   ) * 100
 )
+#>      component  mine published mean_abs_diff_bp
+#> 1 fitted yield 5.861     5.864           0.7698
+#> 2 risk-neutral 4.564     4.417          14.7622
+#> 3 term premium 1.297     1.447          15.0859
 ```
 
 **The fitted yields agree to 0.77bp. The entire discrepancy is in the
@@ -132,11 +154,14 @@ information. The pricing side is pinned by ~120 yields observed at *every*
 date. The real-world dynamics are pinned by the time series alone — and the
 factors are close to a unit root:
 
-```{r}
+
+``` r
 rho <- fit$spectral_radius[["real_world"]]
 c(spectral_radius = rho,
   half_life_months = log(0.5) / log(rho),
   observations = length(fit$dates))
+#>  spectral_radius half_life_months     observations 
+#>           0.9912          78.0625         763.0000
 ```
 
 A shock with a 78-month half-life, observed over 763 months, gives roughly ten
@@ -152,16 +177,22 @@ and Wu (2012) correct it by bootstrap: simulate from a candidate `Phi`,
 re-estimate by OLS, and search for the `Phi` whose OLS estimates are centred on
 what was actually observed.
 
-```{r}
+
+``` r
 bc <- suppressWarnings(atsm(panel, n_factors = 5, p_dynamics = "brw"))
 bc$brw$spectral_radius[c("ols", "corrected")]
+#>       ols corrected 
+#>    0.9912    0.9995
 ```
 
 The correction is large. In half-life terms:
 
-```{r}
+
+``` r
 rho2 <- bc$brw$spectral_radius[c("ols", "corrected")]
 round(log(0.5) / log(rho2) / 12, 1)   # years
+#>       ols corrected 
+#>       6.5     110.7
 ```
 
 Six and a half years becomes effectively permanent. The cross-sectional fit is
@@ -170,8 +201,10 @@ no information about how fast the factors mean-revert, and this implementation
 holds the risk-adjusted dynamics fixed and lets the prices of risk absorb the
 change:
 
-```{r}
+
+``` r
 max(abs(bc$fitted - fit$fitted))
+#> [1] 8.327e-17
 ```
 
 What moves is the split. A more persistent `Phi` means today's rate level is
@@ -179,7 +212,8 @@ expected to last, so the expectations component tracks the level instead of
 reverting to a sample average, and the term premium — its residual — becomes
 smaller in variance:
 
-```{r}
+
+``` r
 j <- match(120L, fit$maturities)
 rbind(
   ols = c(tp_mean = mean(fit$term_premium[, j]), tp_sd = sd(fit$term_premium[, j]),
@@ -187,6 +221,9 @@ rbind(
   brw = c(mean(bc$term_premium[, j]), sd(bc$term_premium[, j]),
           sd(bc$risk_neutral[, j]))
 ) * 1e4
+#>     tp_mean tp_sd rn_sd
+#> ols   129.7 139.3 186.7
+#> brw   148.1 120.1 295.7
 ```
 
 That is BRW's substantive claim: a material share of what the uncorrected model
@@ -195,22 +232,16 @@ fast.
 
 Note what this does to the benchmark comparison:
 
-```{r}
+
+``` r
 cmp$brw_bp <- bc$term_premium[match(cmp$date, fit$dates), j] * 1e4
 c(corr_with_published   = cor(cmp$brw_bp, cmp$pub_bp),
   corr_with_uncorrected = cor(cmp$brw_bp, cmp$mine_bp))
+#>   corr_with_published corr_with_uncorrected 
+#>                0.6580                0.6551
 ```
 
-```{r, echo = FALSE}
-plot(cmp$date, cmp$mine_bp, type = "l", lwd = 1.4, col = "firebrick",
-     xlab = "", ylab = "basis points",
-     ylim = range(cmp$mine_bp, cmp$brw_bp),
-     main = "US 10-year term premium: effect of the bias correction")
-lines(cmp$date, cmp$brw_bp, lwd = 1.4, col = "steelblue")
-abline(h = 0, col = "grey85", lty = 2)
-legend("topright", c("OLS dynamics", "bias-corrected dynamics"),
-       col = c("firebrick", "steelblue"), lwd = 1.4, bty = "n", cex = 0.85)
-```
+<img src="figures/validation-brw-plot-1.png" alt="Line chart of the US 10-year term premium, 1961 to 2024, with OLS and with bias-corrected factor dynamics: the corrected series varies less."  />
 
 The correlation with the New York Fed series falls sharply, and it should: the
 published series is uncorrected. Agreement with it is evidence about the
@@ -236,7 +267,8 @@ interest rate projections."
 That is visible directly. Project the fitted VAR ten years forward and look at
 how much the answer moves:
 
-```{r}
+
+``` r
 expected_ahead <- function(f, h) {
   ex <- f$factors
   for (p in seq_len(h)) ex <- ex %*% t(f$pars$phi) + rep(f$pars$mu, each = nrow(ex))
@@ -244,6 +276,8 @@ expected_ahead <- function(f, h) {
 }
 c(sd_ols_bp = sd(expected_ahead(fit, 120L)),
   sd_brw_bp = sd(expected_ahead(bc, 120L)))
+#> sd_ols_bp sd_brw_bp 
+#>     100.2     282.5
 ```
 
 A standard deviation of around a percentage point in what the model thinks the
@@ -289,16 +323,20 @@ Treasury bills and all securities with under three months to maturity, so their
 short end is *extrapolated*, and they caution against it. ACM's own stated
 inputs include Federal Reserve H.15. The two disagree substantially:
 
-```{r}
+
+``` r
 fitted_1m <- gsw_monthly$yield[gsw_monthly$maturity == 1]
 c(mean_gap_pp = mean(fitted_1m - tbill_3m$value),
   sd_gap_pp = sd(fitted_1m - tbill_3m$value))
+#> mean_gap_pp   sd_gap_pp 
+#>      0.2833      1.2676
 ```
 
 The fitted short end runs ~28bp above actual bill rates, with a large standard
 deviation. Substituting the bill series:
 
-```{r}
+
+``` r
 fit_bill <- suppressWarnings(
   atsm(panel, n_factors = 5, short_rate = tbill_3m, short_rate_units = "percent")
 )
@@ -312,6 +350,10 @@ data.frame(
                     sqrt(mean((fit_bill$observed - fit_bill$fitted)^2)),
                     NA) * 1e4
 )
+#>         short_rate mean_tp_bp curve_rmse_bp
+#> 1    GSW fitted 1m      129.7         1.478
+#> 2 3m Treasury bill      156.4        14.244
+#> 3 NY Fed published      144.7            NA
 ```
 
 **The two short-rate choices bracket the published series.** The fitted
@@ -351,9 +393,12 @@ from the published series alone.
 
 The `suppressWarnings()` at the top was hiding this:
 
-```{r}
+
+``` r
 c(min_expected_short_rate_pct = fit$zlb$min * 100,
   share_negative = fit$zlb$frac_negative)
+#> min_expected_short_rate_pct              share_negative 
+#>                   -3.152414                    0.004107
 ```
 
 Fitted over a sample spanning the zero lower bound, the model projects expected

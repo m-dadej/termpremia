@@ -20,16 +20,17 @@
 # For scale, the site's own curve averaged the same way reaches 0.995 on
 # changes, and at month-end, as in replicate-poland.R, 0.998.
 #
-# DATA. data/polgovs.xlsx holds monthly averages of daily rates, in percent,
-# dated the first of each month:
+# DATA. Neither input is distributed with the package; both are read from a
+# local directory (DATA_DIR, below). polgovs.xlsx holds monthly averages of
+# daily rates, in percent, dated the first of each month:
 #   - 1month, 3month, 6month: money-market rates. They sit 9, 20 and 25bp
 #     above the site's government curve on average, so they behave like
 #     interbank rates, not bills.
 #   - 1year, 2year, 5year, 7year, 10year: coupon benchmark yields. 7year
 #     starts only in 2018:08.
 #   - 1year_es: not identified; unused.
-# The site's term premium export (needs `date`, `acm_bp`) is read from a local
-# path, as in replicate-poland.R, and used only for the comparison.
+# The site's term premium export (needs `date`, `acm_bp`), as in
+# replicate-poland.R, is used only for the comparison.
 #
 # WHY THESE FIVE RATES.
 #
@@ -106,8 +107,8 @@
 
 # --- configuration -------------------------------------------------------
 
-XLSX        <- "data/polgovs.xlsx"
 DATA_DIR    <- "C:/Users/Mateusz/Documents/R/test_package"
+XLSX        <- file.path(DATA_DIR, "polgovs.xlsx")
 TP_CSV      <- file.path(DATA_DIR, "yc_pl_tp_10y_acm_brw.csv")
 
 # Spreadsheet columns used, with their maturities in months.

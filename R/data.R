@@ -3,7 +3,7 @@
 #' A frozen snapshot of the Gurkaynak, Sack and Wright (GSW) nominal Treasury
 #' zero-coupon curve, evaluated on a monthly maturity grid and sampled at
 #' month ends. This is the input used to reproduce the New York Fed's published
-#' ACM term premium estimates.
+#' ACM term premium estimates, which [acm_published()] downloads.
 #'
 #' @section Why this is not simply the published file:
 #' The Federal Reserve Board publishes fitted yields as `SVENY01`-`SVENY30`,
@@ -54,63 +54,6 @@
 #' observed <- gsw_monthly[!gsw_monthly$extrapolated, ]
 #' range(observed$date[observed$maturity == 120])
 "gsw_monthly"
-
-
-#' New York Fed published ACM term premium estimates, month-end, 1961-2024
-#'
-#' The Federal Reserve Bank of New York's published decomposition of US
-#' Treasury yields into an expected-average-short-rate component and a term
-#' premium, from the five-factor model of Adrian, Crump and Moench (2013).
-#'
-#' This dataset is a **reference for validation**, not an input to estimation.
-#' It is what this package's own ACM implementation is checked against.
-#'
-#' @section Licence:
-#' This dataset is **not** covered by the package's MIT licence. It is
-#' redistributed under the New York Fed's Terms of Use, which require
-#' attribution, clear labelling of modifications, and that the same permissions
-#' pass to downstream users. See the `LICENSE.note` file at the package root.
-#'
-#' Attribution: \emph{(c) Federal Reserve Bank of New York. Content from the
-#' New York Fed subject to the Terms of Use at newyorkfed.org.}
-#'
-#' Modifications made: only the monthly sheet is retained, the series are
-#' reshaped from wide to long, and the sample is truncated at 2024-12-31. No
-#' values are altered.
-#'
-#' @section The decomposition is exact:
-#' `fitted == risk_neutral + term_premium` holds to machine precision in the
-#' published data (maximum absolute residual 4.4e-16), and the build script
-#' asserts it. Any implementation in this package must satisfy the same
-#' identity.
-#'
-#' @format A data frame with 7,630 rows and 5 columns:
-#' \describe{
-#'   \item{date}{Month-end observation date.}
-#'   \item{maturity}{Maturity in months: 12, 24, ..., 120.}
-#'   \item{fitted}{Model-fitted zero-coupon yield, in percent (`ACMY`).}
-#'   \item{term_premium}{Term premium, in percent (`ACMTP`).}
-#'   \item{risk_neutral}{Risk-neutral yield, that is the expected average
-#'     future short rate over the life of the bond, in percent (`ACMRNY`).}
-#' }
-#'
-#' @source
-#' Federal Reserve Bank of New York, Treasury Term Premia,
-#' <https://www.newyorkfed.org/research/data_indicators/term-premia-tabs>.
-#' Built by `data-raw/acm.R`.
-#'
-#' @references
-#' Adrian, T., R. K. Crump and E. Moench (2013). "Pricing the term structure
-#' with linear regressions." *Journal of Financial Economics* 110(1), 110-138.
-#'
-#' @examples
-#' # The published decomposition adds up exactly
-#' with(acm_published, max(abs(fitted - (risk_neutral + term_premium))))
-#'
-#' # Ten-year term premium, most recent observations
-#' tp10 <- acm_published[acm_published$maturity == 120, ]
-#' tail(tp10[, c("date", "term_premium")])
-"acm_published"
 
 
 #' Three-month US Treasury bill rate, month-end aligned, 1961-2024

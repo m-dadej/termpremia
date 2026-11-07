@@ -29,8 +29,8 @@ MATURITIES_M <- 1:120                  # months; ACM's grid
 
 # --- download -----------------------------------------------------------
 
-# Cached on disk rather than in tempdir() so that re-running this script, or
-# running it alongside data-raw/acm.R, does not re-download 10MB each time.
+# Cached on disk rather than in tempdir() so that re-running this script does
+# not re-download 10MB each time.
 cache_dir <- file.path("data-raw", ".cache")
 dir.create(cache_dir, showWarnings = FALSE, recursive = TRUE)
 cache <- file.path(cache_dir, "feds200628.csv")

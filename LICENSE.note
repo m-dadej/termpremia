@@ -1,47 +1,15 @@
-LICENCE NOTES FOR BUNDLED DATA
-==============================
+LICENCE NOTES FOR DATA
+======================
 
 The termpremia package is released under the MIT licence (see LICENSE).
 
-Datasets distributed with the package are NOT all covered by that licence.
-Each is governed by the terms of its own source, recorded below. Where those
-terms are more restrictive than MIT, they govern.
+The datasets bundled with it derive from Federal Reserve Board releases that
+assert no copyright and place no restriction on redistribution. Their sources
+are recorded below. Data whose terms are more restrictive is downloaded on the
+user's behalf and never shipped; see "Notes on data not bundled".
 
 
-1. acm_published  --  Federal Reserve Bank of New York
---------------------------------------------------------------------
-
-Source: Treasury Term Premia
-        https://www.newyorkfed.org/research/data_indicators/term-premia-tabs
-        https://www.newyorkfed.org/medialibrary/media/research/data_indicators/ACMTermPremium.xls
-
-Redistributed under the New York Fed's Terms of Use
-(https://www.newyorkfed.org/privacy/termsofuse), which permit downloading,
-storing, copying and distributing their content subject to three conditions.
-All three are met as follows.
-
-  (a) Attribution. Source identifiers and copyright notices are retained:
-
-        (c) Federal Reserve Bank of New York. Content from the New York Fed
-        subject to the Terms of Use at newyorkfed.org.
-
-  (b) Modifications clearly labelled. The following changes were made to the
-      published workbook. No values were altered.
-
-        - Only the "ACM Monthly" sheet is retained; the daily sheet is dropped.
-        - The series are reshaped from wide (one column per tenor) to long.
-        - The sample is truncated at 2024-12-31 so the snapshot is stable.
-
-      The reshaping is performed by data-raw/acm.R, which is included in the
-      source repository so the transformation is fully reproducible.
-
-  (c) Same permissions passed on. Anyone receiving this package receives
-      acm_published under these same terms, conditions and restrictions --
-      not under the MIT licence. Redistributing it onward requires carrying
-      this notice with it.
-
-
-2. gsw_monthly  --  Federal Reserve Board
+1. gsw_monthly  --  Federal Reserve Board
 --------------------------------------------------------------------
 
 Source: Series feds200628, "Nominal Yield Curve"
@@ -59,8 +27,40 @@ Please cite the underlying research:
   curve: 1961 to the present." Journal of Monetary Economics 54(8), 2291-2304.
 
 
+2. tbill_3m  --  Federal Reserve Board, via FRED
+--------------------------------------------------------------------
+
+Source: Federal Reserve Board H.15, distributed as FRED series TB3MS
+        https://fred.stlouisfed.org/series/TB3MS
+
+A Federal Reserve Board release; no copyright is asserted. Aligned to the
+gsw_monthly dates by data-raw/tbill.R.
+
+
 Notes on data not bundled
 --------------------------------------------------------------------
+
+New York Fed ACM term premia (acm_published()) are NOT distributed with this
+package. The New York Fed's Terms of Use
+(https://www.newyorkfed.org/privacy/termsofuse) do permit copying and
+redistribution, but on conditions -- attribution, clearly labelled
+modifications, and the same terms passed on to every recipient -- in a licence
+that is not a standard open-source licence and that the New York Fed may
+change without notice. Shipping the data would have left part of the package
+outside the MIT licence its DESCRIPTION declares.
+
+acm_published() therefore downloads the published workbook on the user's
+behalf, which puts them in a direct relationship with those terms, and
+attaches the required attribution to the result:
+
+    (c) Federal Reserve Bank of New York. Content from the New York Fed
+    subject to the Terms of Use at newyorkfed.org.
+
+Nothing that runs on CRAN depends on it. The parser is tested on a synthetic
+sheet; the comparisons against the published series run only off CRAN, and
+skip when the download fails; and the validation vignette is precomputed by
+vignettes/precompile.R, so building it needs neither the data nor a network
+connection.
 
 Philadelphia Fed Survey of Professional Forecasters (BILL10, TBILL) is NOT
 distributed with this package. The Philadelphia Fed asserts copyright with all

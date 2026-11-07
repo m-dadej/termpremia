@@ -101,7 +101,11 @@ change before the first CRAN submission. Pin a commit if you build on it.
 
 * `gsw_monthly` — US Treasury zero-coupon yields, month-end, 1961–2024,
   maturities 1–120 months, with extrapolated observations flagged.
-* `acm_published` — the New York Fed's published ACM decomposition, for
-  validation. Governed by the New York Fed's terms, not this package's MIT
-  licence; see `LICENSE.note`.
 * `tbill_3m` — 3-month Treasury bill rate, as an alternative short rate.
+* `acm_published()` downloads the New York Fed's published ACM decomposition,
+  for validation. It replaces the `acm_published` dataset, which is no longer
+  bundled: the New York Fed's terms of use, not this package's MIT licence,
+  govern that data, so it is fetched on the user's behalf rather than
+  redistributed. See `LICENSE.note`. Needs `readxl`.
+* `vignette("validation")` is precomputed (`vignettes/precompile.R`), since it
+  compares against the downloaded series.

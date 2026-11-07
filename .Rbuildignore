@@ -7,3 +7,5 @@
 ^HANDOVER\.md$
 ^CLAUDE\.md$
 ^literature$
+^vignettes/precompile\.R$
+^vignettes/.*\.Rmd\.orig$

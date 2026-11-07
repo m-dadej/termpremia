@@ -268,10 +268,10 @@ read_fed_curve_file <- function(path) {
 
 #' @keywords internal
 #' @noRd
-fetch_to_file <- function(url, cache, quiet, what) {
+fetch_to_file <- function(url, cache, quiet, what, fileext = ".csv") {
   if (!is.null(cache) && file.exists(cache)) return(cache)
 
-  dest <- cache %||% tempfile(fileext = ".csv")
+  dest <- cache %||% tempfile(fileext = fileext)
   tryCatch(
     utils::download.file(url, dest, mode = "wb", quiet = quiet),
     error = function(e) {

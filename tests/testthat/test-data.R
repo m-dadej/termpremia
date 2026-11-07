@@ -31,26 +31,32 @@ test_that("short maturities are never extrapolated", {
   expect_false(any(short$extrapolated))
 })
 
-test_that("acm_published has the documented shape", {
-  expect_s3_class(acm_published, "data.frame")
-  expect_named(acm_published,
+# The New York Fed's series is downloaded, not bundled: see helper-nyfed.R.
+
+test_that("acm_published() returns the documented shape", {
+  acm <- nyfed_acm()
+  expect_s3_class(acm, "data.frame")
+  expect_named(acm,
                c("date", "maturity", "fitted", "term_premium", "risk_neutral"))
-  expect_s3_class(acm_published$date, "Date")
-  expect_equal(sort(unique(acm_published$maturity)), seq(12L, 120L, by = 12L))
+  expect_s3_class(acm$date, "Date")
+  expect_equal(sort(unique(acm$maturity)), seq(12L, 120L, by = 12L))
+  expect_match(attr(acm, "attribution"),
+               paste0("^", intToUtf8(169L),
+                      " [0-9]{4} Federal Reserve Bank of New York\\. "))
 })
 
 test_that("the published ACM decomposition is exact", {
   # fitted = risk_neutral + term_premium, to machine precision. This is the
   # identity our own implementation must also satisfy.
-  gap <- with(acm_published, fitted - (risk_neutral + term_premium))
+  gap <- with(nyfed_acm(), fitted - (risk_neutral + term_premium))
   expect_lt(max(abs(gap)), 1e-12)
 })
 
-test_that("gsw_monthly and acm_published share an identical date index", {
-  # M4 compares our ACM fit on gsw_monthly against acm_published, so any
-  # mismatch here would silently misalign the benchmark.
+test_that("gsw_monthly and the published ACM series share a date index", {
+  # The validation compares our ACM fit on gsw_monthly against the published
+  # series, so any mismatch here would silently misalign the benchmark.
   g <- sort(unique(gsw_monthly$date))
-  a <- sort(unique(acm_published$date))
+  a <- sort(unique(nyfed_acm()$date))
   expect_identical(g, a)
 })
 

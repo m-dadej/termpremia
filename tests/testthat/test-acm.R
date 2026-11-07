@@ -184,9 +184,10 @@ test_that("estimated dynamics are stationary on US data", {
 test_that("the US term premium reproduces the published NY Fed series", {
   # The credibility check. Levels differ by a roughly constant offset, but the
   # dynamics must track very closely; see the M4 notes on the remaining gap.
+  acm <- nyfed_acm()    # downloaded, so skipped on CRAN; see helper-nyfed.R
   f <- us_fit()
   mine <- term_premium(f, maturity = 120)
-  pub <- acm_published[acm_published$maturity == 120, c("date", "term_premium")]
+  pub <- acm[acm$maturity == 120, c("date", "term_premium")]
 
   m <- merge(mine, pub, by = "date")
   expect_equal(nrow(m), 763L)

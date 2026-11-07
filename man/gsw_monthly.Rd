@@ -30,7 +30,7 @@ gsw_monthly
 A frozen snapshot of the Gurkaynak, Sack and Wright (GSW) nominal Treasury
 zero-coupon curve, evaluated on a monthly maturity grid and sampled at
 month ends. This is the input used to reproduce the New York Fed's published
-ACM term premium estimates.
+ACM term premium estimates, which \code{\link[=acm_published]{acm_published()}} downloads.
 }
 \section{Why this is not simply the published file}{
 
