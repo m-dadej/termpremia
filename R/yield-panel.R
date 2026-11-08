@@ -460,6 +460,13 @@ print.summary.yield_panel <- function(x, ...) {
 #' @param curve Name of the curve. Defaults to the first (and usually only) one.
 #' @return A numeric matrix of decimal yields, dates in rows and maturities
 #'   (in months) in columns.
+#' @examples
+#' recent <- gsw_monthly[gsw_monthly$date >= as.Date("2024-01-01"), ]
+#' panel <- yield_panel(recent, units = "percent", maturity_unit = "months",
+#'                      issuer = "US")
+#' m <- curve_matrix(panel)
+#' dim(m)
+#' m[1:3, c("12", "60", "120")]    # decimals, not percent
 #' @export
 curve_matrix <- function(x, curve = NULL) {
   stopifnot(inherits(x, "yield_panel"))

@@ -165,10 +165,10 @@
 #' @seealso [predict.svensson_fit()], [svensson_curve()], [yield_panel()]
 #'
 #' @examples
-#' # The US curve observed only at eight standard tenors, over ten years
+#' # The US curve observed only at eight standard tenors, over three years
 #' tenors <- c(3, 6, 12, 24, 36, 60, 84, 120)
 #' sparse <- gsw_monthly[gsw_monthly$maturity %in% tenors &
-#'                       gsw_monthly$date >= as.Date("2015-01-01"), ]
+#'                       gsw_monthly$date >= as.Date("2022-01-01"), ]
 #' panel <- yield_panel(sparse, units = "percent", maturity_unit = "months",
 #'                      issuer = "US")
 #'
@@ -1005,6 +1005,22 @@ holdout_check <- function(y, maturities, model, tau, tau_range, min_obs,
 #'   dropped, so that a gap cannot pass unnoticed into the factor VAR.
 #'
 #' @seealso [svensson_fit()]
+#'
+#' @examples
+#' tenors <- c(3, 6, 12, 24, 36, 60, 84, 120)
+#' sparse <- gsw_monthly[gsw_monthly$maturity %in% tenors &
+#'                       gsw_monthly$date >= as.Date("2024-01-01"), ]
+#' panel <- yield_panel(sparse, units = "percent", maturity_unit = "months",
+#'                      issuer = "US")
+#' fit <- svensson_fit(panel, yield_type = "zero", check = FALSE)
+#'
+#' # Every month from 1 to 120; below 3 months the curve is extrapolated
+#' dense <- predict(fit, maturities = 1:120)
+#' curve_matrix(dense)[1:3, c("1", "3", "120")]
+#'
+#' # A different grid for a different purpose: annual tenors only
+#' predict(fit, maturities = seq(12, 120, by = 12))
+#'
 #' @export
 predict.svensson_fit <- function(object, maturities = NULL, ...) {
   meta <- object$meta
@@ -1068,6 +1084,20 @@ predict_maturities <- function(maturities, name, observed) {
 #'   `tau2` (years), the in-sample `rmse` (decimals) and `n_obs`. It can be
 #'   passed straight to [svensson_curve()], which returns decimal yields from
 #'   it. Nelson-Siegel fits have `beta3 = 0` and `tau2 = NA`.
+#'
+#' @examples
+#' tenors <- c(3, 6, 12, 24, 36, 60, 84, 120)
+#' sparse <- gsw_monthly[gsw_monthly$maturity %in% tenors &
+#'                       gsw_monthly$date >= as.Date("2024-01-01"), ]
+#' panel <- yield_panel(sparse, units = "percent", maturity_unit = "months",
+#'                      issuer = "US")
+#' fit <- svensson_fit(panel, yield_type = "zero", check = FALSE)
+#'
+#' cf <- coef(fit)
+#' head(cf)
+#'
+#' # The parameters give the curve at any maturity, here 1, 5 and 10 years
+#' svensson_curve(cf, maturity = c(1, 5, 10))[1:3, ]
 #'
 #' @export
 coef.svensson_fit <- function(object, curve = NULL, ...) {

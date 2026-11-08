@@ -27,6 +27,22 @@ dropped, so that a gap cannot pass unnoticed into the factor VAR.
 \description{
 Evaluate fitted curves on a maturity grid
 }
+\examples{
+tenors <- c(3, 6, 12, 24, 36, 60, 84, 120)
+sparse <- gsw_monthly[gsw_monthly$maturity \%in\% tenors &
+                      gsw_monthly$date >= as.Date("2024-01-01"), ]
+panel <- yield_panel(sparse, units = "percent", maturity_unit = "months",
+                     issuer = "US")
+fit <- svensson_fit(panel, yield_type = "zero", check = FALSE)
+
+# Every month from 1 to 120; below 3 months the curve is extrapolated
+dense <- predict(fit, maturities = 1:120)
+curve_matrix(dense)[1:3, c("1", "3", "120")]
+
+# A different grid for a different purpose: annual tenors only
+predict(fit, maturities = seq(12, 120, by = 12))
+
+}
 \seealso{
 \code{\link[=svensson_fit]{svensson_fit()}}
 }

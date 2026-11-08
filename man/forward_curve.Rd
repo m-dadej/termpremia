@@ -33,8 +33,11 @@ the pricing error alone.
 }
 
 \examples{
-panel <- yield_panel(gsw_monthly, units = "percent",
-                     maturity_unit = "months", issuer = "US")
+# 1990-2007, before the zero lower bound; see atsm()
+us <- gsw_monthly[gsw_monthly$date >= as.Date("1990-01-01") &
+                  gsw_monthly$date <= as.Date("2007-12-31"), ]
+panel <- yield_panel(us, units = "percent", maturity_unit = "months",
+                     issuer = "US")
 fit <- atsm(panel, n_factors = 5)
 fc <- forward_curve(fit)
 head(fc)

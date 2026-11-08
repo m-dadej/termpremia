@@ -53,11 +53,10 @@ them.
 }
 
 \examples{
-\dontrun{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 rpi <- ons_rpi(extend_to = "1984-12-01")
 sum(rpi$chained)
-}
-
+\dontshow{\}) # examplesIf}
 }
 \seealso{
 \code{\link[=atsm_real]{atsm_real()}}, \code{\link[=boe_yield_curve]{boe_yield_curve()}}

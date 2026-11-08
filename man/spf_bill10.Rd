@@ -54,15 +54,14 @@ is well inside what any of this resolves.
 }
 
 \examples{
-\dontrun{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 # Near and far horizons together is the configuration that works.
 surveys <- rbind(spf_tbill(), spf_bill10())
 
 panel <- yield_panel(gsw_monthly, units = "percent",
                      maturity_unit = "months", issuer = "US")
 fit <- atsm(panel, n_factors = 5, p_dynamics = "survey", survey = surveys)
-}
-
+\dontshow{\}) # examplesIf}
 }
 \seealso{
 \code{\link[=spf_tbill]{spf_tbill()}}, \code{\link[=atsm]{atsm()}}, \code{\link[=survey_control]{survey_control()}}

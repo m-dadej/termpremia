@@ -9,3 +9,4 @@
 ^literature$
 ^vignettes/precompile\.R$
 ^vignettes/.*\.Rmd\.orig$
+^cran-comments\.md$

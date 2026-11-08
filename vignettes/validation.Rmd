@@ -23,7 +23,7 @@ The published series is downloaded, not bundled, so this vignette is
 precomputed: its output was generated when it was written, not when the package
 was built. It uses the New York Fed release downloaded on
 07 November 2026, with termpremia
-0.0.0.9000. The New York Fed revises its
+0.1.0. The New York Fed revises its
 history at each update, so a fresh download can move the comparisons below in
 their last digit.
 

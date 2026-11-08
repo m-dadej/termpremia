@@ -59,8 +59,7 @@
 #'
 #' @seealso [atsm()], [survey_control()], [term_premium_survey()]
 #'
-#' @examples
-#' \dontrun{
+#' @examplesIf interactive()
 #' spf <- spf_tbill()
 #'
 #' panel <- yield_panel(gsw_monthly, units = "percent",
@@ -68,7 +67,6 @@
 #'
 #' fit <- atsm(panel, n_factors = 5, p_dynamics = "survey", survey = spf,
 #'             survey_control = survey_control(tenor = 3, average_months = 3))
-#' }
 #'
 #' @export
 spf_tbill <- function(horizons = 1:4,
@@ -141,15 +139,13 @@ spf_tbill <- function(horizons = 1:4,
 #'
 #' @seealso [spf_tbill()], [atsm()], [survey_control()]
 #'
-#' @examples
-#' \dontrun{
+#' @examplesIf interactive()
 #' # Near and far horizons together is the configuration that works.
 #' surveys <- rbind(spf_tbill(), spf_bill10())
 #'
 #' panel <- yield_panel(gsw_monthly, units = "percent",
 #'                      maturity_unit = "months", issuer = "US")
 #' fit <- atsm(panel, n_factors = 5, p_dynamics = "survey", survey = surveys)
-#' }
 #'
 #' @export
 spf_bill10 <- function(url = paste0(

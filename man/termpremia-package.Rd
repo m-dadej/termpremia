@@ -6,7 +6,15 @@
 \alias{termpremia-package}
 \title{termpremia: Term Premium Decomposition from Zero-Coupon Yield Curves}
 \description{
-Estimates Gaussian affine term structure models and decomposes zero-coupon government bond yields into expected average future short rates and a term premium. Implements the three-step regression estimator of Adrian, Crump and Moench (2013), together with a model-free survey-based benchmark. Accepts any zero-coupon yield curve and reports term premia, risk-neutral yields, expected short-rate paths, expected excess returns and forward-rate decompositions.
+Estimates Gaussian affine term structure models and decomposes zero-coupon government bond yields into expected average future short rates and a term premium, using the three-step regression estimator of Adrian, Crump and Moench (2013) \doi{10.1016/j.jfineco.2013.04.009}. Factor dynamics can be estimated by least squares, corrected for small-sample bias following Bauer, Rudebusch and Wu (2012) \doi{10.1080/07350015.2012.693855}, or anchored to survey forecasts of short rates in the spirit of Kim and Orphanides (2012) \doi{10.1017/S0022109012000038}. A joint model of nominal and inflation-indexed curves, following Abrahams, Adrian, Crump, Moench and Yu (2016) \doi{10.1016/j.jmoneco.2016.10.006}, splits breakeven inflation into expected inflation and an inflation risk premium. Curves observed at only a few tenors can be rebuilt on a monthly maturity grid with the Nelson and Siegel (1987) \doi{10.1086/296409} or Svensson (1994) \doi{10.3386/w4871} model. Reports term premia, risk-neutral yields, expected short-rate paths, expected excess returns and forward-rate decompositions, alongside a model-free survey-based benchmark.
+}
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/m-dadej/termpremia}
+  \item Report bugs at \url{https://github.com/m-dadej/termpremia/issues}
+}
+
 }
 \author{
 \strong{Maintainer}: Mateusz Dadej \email{mateuszdadej@gmail.com}

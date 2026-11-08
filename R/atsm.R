@@ -128,8 +128,14 @@
 #'   alternative P-dynamics, and [spf_tbill()] for free survey data.
 #'
 #' @examples
-#' panel <- yield_panel(gsw_monthly, units = "percent",
-#'                      maturity_unit = "months", issuer = "US")
+#' # 1990-2007: a sample that ends before US rates reached the zero lower
+#' # bound, where Gaussian models like this one misbehave. The full 1961-2024
+#' # fit, and what the model reports about the bound, are in
+#' # vignette("validation").
+#' us <- gsw_monthly[gsw_monthly$date >= as.Date("1990-01-01") &
+#'                   gsw_monthly$date <= as.Date("2007-12-31"), ]
+#' panel <- yield_panel(us, units = "percent", maturity_unit = "months",
+#'                      issuer = "US")
 #' fit <- atsm(panel, n_factors = 5)
 #' fit
 #'
@@ -445,6 +451,23 @@ zlb_check <- function(rn, maturities, threshold = -0.01) {
 #'   annualised decimals, so multiply by 100 for percent or 10000 for basis
 #'   points.
 #'
+#' @examples
+#' # 1990-2007, before the zero lower bound; see atsm()
+#' us <- gsw_monthly[gsw_monthly$date >= as.Date("1990-01-01") &
+#'                   gsw_monthly$date <= as.Date("2007-12-31"), ]
+#' panel <- yield_panel(us, units = "percent", maturity_unit = "months",
+#'                      issuer = "US")
+#' fit <- atsm(panel, n_factors = 5)
+#'
+#' tp <- term_premium(fit, maturity = c(24, 120))
+#' tail(tp)
+#'
+#' # The fitted yield is the risk-neutral yield plus the term premium
+#' rn <- risk_neutral(fit, maturity = 120)
+#' yhat <- fitted(fit)
+#' yhat <- yhat[yhat$maturity == 120, ]
+#' max(abs(yhat$value - (rn$value + tp$value[tp$maturity == 120])))
+#'
 #' @name atsm-extractors
 NULL
 
@@ -538,6 +561,21 @@ coef.atsm_fit <- function(object, ...) {
 #'
 #' @return A data frame with `date`, `maturity`, `fitted`, `risk_neutral` and
 #'   `term_premium`.
+#'
+#' @examples
+#' us <- gsw_monthly[gsw_monthly$date >= as.Date("1980-01-01") &
+#'                   gsw_monthly$date <= as.Date("2007-12-31"), ]
+#' as_panel <- function(d) {
+#'   yield_panel(d, units = "percent", maturity_unit = "months",
+#'               issuer = "US")
+#' }
+#' early <- as_panel(us[us$date <= as.Date("2004-12-31"), ])
+#' late <- as_panel(us[us$date > as.Date("2004-12-31"), ])
+#'
+#' # Estimated to 2004, then applied to 2005-2007 with the parameters fixed
+#' fit <- atsm(early, n_factors = 5)
+#' out <- predict(fit, late)
+#' head(out[out$maturity == 120, ])
 #'
 #' @export
 predict.atsm_fit <- function(object, newdata, ...) {

@@ -12,8 +12,9 @@ A data frame with 763 rows and 2 columns:
 }
 }
 \source{
-Federal Reserve Board H.15, distributed as FRED series \code{TB3MS},
-\url{https://fred.stlouisfed.org/series/TB3MS}. Built by \code{data-raw/tbill.R}.
+Federal Reserve Board H.15,
+\url{https://www.federalreserve.gov/releases/h15/}, as distributed by FRED
+(series \code{TB3MS}). Built by \code{data-raw/tbill.R}.
 }
 \usage{
 tbill_3m

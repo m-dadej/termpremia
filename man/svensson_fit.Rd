@@ -180,10 +180,10 @@ by up to 92bp. See \code{analysis/validate-svensson-fit.R}.
 }
 
 \examples{
-# The US curve observed only at eight standard tenors, over ten years
+# The US curve observed only at eight standard tenors, over three years
 tenors <- c(3, 6, 12, 24, 36, 60, 84, 120)
 sparse <- gsw_monthly[gsw_monthly$maturity \%in\% tenors &
-                      gsw_monthly$date >= as.Date("2015-01-01"), ]
+                      gsw_monthly$date >= as.Date("2022-01-01"), ]
 panel <- yield_panel(sparse, units = "percent", maturity_unit = "months",
                      issuer = "US")
 

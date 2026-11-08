@@ -24,6 +24,8 @@ jobs:
           - {os: ubuntu-latest,   r: 'devel', http-user-agent: 'release'}
           - {os: ubuntu-latest,   r: 'release'}
           - {os: ubuntu-latest,   r: 'oldrel-1'}
+          # The minimum declared in DESCRIPTION, so the floor stays tested.
+          - {os: ubuntu-latest,   r: '4.3'}
 
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}

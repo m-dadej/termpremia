@@ -42,10 +42,23 @@ draws it.}
 Plot a fitted joint real-nominal decomposition
 }
 \examples{
-\dontrun{
-fit <- atsm_real(panel, inflation = cpi)
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+# Downloads the GSW TIPS curve and two FRED series; see atsm_real().
+tips <- gsw_tips(align_to = unique(gsw_monthly$date))
+nom <- gsw_monthly[, c("date", "maturity", "yield")]
+nom$curve <- "nominal"
+rea <- tips[, c("date", "maturity", "yield")]
+rea$curve <- "tips"
+panel <- yield_panel(
+  rbind(nom, rea), curve = "curve", units = "percent",
+  maturity_unit = "months",
+  instrument = c(nominal = "government", tips = "tips"), issuer = "US"
+)
+fit <- atsm_real(panel, inflation = fred_series("CPIAUCNS"),
+                 short_rate = fred_series("DFF", at_dates = panel$dates),
+                 short_rate_units = "percent")
+
 plot(fit)                     # breakeven decomposition
 plot(fit, type = "real")      # the two term premia
-}
-
+\dontshow{\}) # examplesIf}
 }

@@ -100,12 +100,11 @@ hard dependency of termpremia, and nothing here is redistributed.
 }
 
 \examples{
-\dontrun{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 nom <- boe_yield_curve("nominal", end = "2012-12-31")
 rea <- boe_yield_curve("real", end = "2012-12-31")
 mean(nom$extrapolated)
-}
-
+\dontshow{\}) # examplesIf}
 }
 \references{
 Anderson, N. and J. Sleath (2001). "New estimates of the UK real and

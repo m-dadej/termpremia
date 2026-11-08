@@ -85,8 +85,9 @@
 #'   \item{value}{Secondary market rate, monthly average, in percent.}
 #' }
 #'
-#' @source Federal Reserve Board H.15, distributed as FRED series `TB3MS`,
-#'   <https://fred.stlouisfed.org/series/TB3MS>. Built by `data-raw/tbill.R`.
+#' @source Federal Reserve Board H.15,
+#'   <https://www.federalreserve.gov/releases/h15/>, as distributed by FRED
+#'   (series `TB3MS`). Built by `data-raw/tbill.R`.
 #'
 #' @examples
 #' panel <- yield_panel(gsw_monthly, units = "percent",

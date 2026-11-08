@@ -67,7 +67,7 @@ hard dependency of termpremia.
 }
 
 \examples{
-\dontrun{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 spf <- spf_tbill()
 
 panel <- yield_panel(gsw_monthly, units = "percent",
@@ -75,8 +75,7 @@ panel <- yield_panel(gsw_monthly, units = "percent",
 
 fit <- atsm(panel, n_factors = 5, p_dynamics = "survey", survey = spf,
             survey_control = survey_control(tenor = 3, average_months = 3))
-}
-
+\dontshow{\}) # examplesIf}
 }
 \references{
 Federal Reserve Bank of Philadelphia. \emph{Survey of Professional Forecasters}.

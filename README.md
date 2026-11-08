@@ -12,7 +12,8 @@ yield(n) = expected average future short rate(n) + term premium(n)
 breakeven(n) = expected inflation(n) + inflation risk premium(n)
 ```
 
-The package is working and validated, but the API is not yet stable.
+The package is working and validated; the API may still change while the
+version is 0.x.
 
 ## Installation
 
@@ -222,9 +223,9 @@ of England's real curve — and fitting the real curve to 1.17bp RMSE.
 
 ## Stability and scope
 
-**The API may change before the first CRAN release.** The point of publishing
-here is to get feedback while changes are still cheap. If you build something
-on it, pin a commit. Breaking changes will be noted in `NEWS.md`.
+**The API may still change while the version is 0.x.** Feedback is most useful
+now, while changes are still cheap. If you build something on it, pin a
+version. Breaking changes will be noted in `NEWS.md`.
 
 In scope: ACM estimation; Bauer-Rudebusch-Wu bias correction; survey-augmented
 dynamics; the joint real-nominal decomposition; term premia by tenor,

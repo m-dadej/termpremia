@@ -105,25 +105,29 @@
 #' @seealso [atsm()] for a single curve, [expected_inflation()],
 #'   [inflation_risk_premium()], [breakeven()], [gsw_tips()]
 #'
-#' @examples
-#' \dontrun{
-#' nom <- gsw_monthly
+#' @examplesIf interactive()
+#' # Downloads the GSW TIPS curve and two FRED series. `align_to` puts the
+#' # TIPS month-ends on the nominal curve's dates; see gsw_tips().
+#' tips <- gsw_tips(align_to = unique(gsw_monthly$date))
+#'
+#' nom <- gsw_monthly[, c("date", "maturity", "yield")]
 #' nom$curve <- "nominal"
-#' tips <- gsw_tips()
-#' tips$curve <- "tips"
+#' rea <- tips[, c("date", "maturity", "yield")]
+#' rea$curve <- "tips"
 #'
 #' panel <- yield_panel(
-#'   rbind(nom[, c("date", "maturity", "yield", "curve")],
-#'         tips[, c("date", "maturity", "yield", "curve")]),
-#'   curve = "curve", units = "percent", maturity_unit = "months",
+#'   rbind(nom, rea), curve = "curve", units = "percent",
+#'   maturity_unit = "months",
 #'   instrument = c(nominal = "government", tips = "tips"), issuer = "US"
 #' )
 #'
+#' # CPI-U, not seasonally adjusted, and the effective federal funds rate
 #' cpi <- fred_series("CPIAUCNS")
-#' fit <- atsm_real(panel, inflation = cpi,
-#'                  short_rate = fred_series("DFF", frequency = "monthly"))
+#' ff <- fred_series("DFF", at_dates = panel$dates)
+#'
+#' fit <- atsm_real(panel, inflation = cpi, short_rate = ff,
+#'                  short_rate_units = "percent")
 #' fit
-#' }
 #'
 #' @export
 atsm_real <- function(panel,
@@ -565,6 +569,30 @@ liquidity_component <- function(b, x, maturities, liq_index) {
 #'
 #' @return A data frame with columns `date`, `maturity` and `value`, in
 #'   annualised decimals.
+#'
+#' @examplesIf interactive()
+#' # Downloads the GSW TIPS curve and two FRED series; see atsm_real().
+#' tips <- gsw_tips(align_to = unique(gsw_monthly$date))
+#' nom <- gsw_monthly[, c("date", "maturity", "yield")]
+#' nom$curve <- "nominal"
+#' rea <- tips[, c("date", "maturity", "yield")]
+#' rea$curve <- "tips"
+#' panel <- yield_panel(
+#'   rbind(nom, rea), curve = "curve", units = "percent",
+#'   maturity_unit = "months",
+#'   instrument = c(nominal = "government", tips = "tips"), issuer = "US"
+#' )
+#' fit <- atsm_real(panel, inflation = fred_series("CPIAUCNS"),
+#'                  short_rate = fred_series("DFF", at_dates = panel$dates),
+#'                  short_rate_units = "percent")
+#'
+#' # Ten-year breakeven, split into its two parts
+#' be <- breakeven(fit, maturity = 120)
+#' ei <- expected_inflation(fit, maturity = 120)
+#' irp <- inflation_risk_premium(fit, maturity = 120)
+#' max(abs(be$value - (ei$value + irp$value)))    # exact, by construction
+#'
+#' tail(real_term_premium(fit, maturity = 120))
 #'
 #' @name atsm-real-extractors
 NULL

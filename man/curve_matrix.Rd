@@ -18,3 +18,11 @@ A numeric matrix of decimal yields, dates in rows and maturities
 \description{
 Extract a curve as a matrix
 }
+\examples{
+recent <- gsw_monthly[gsw_monthly$date >= as.Date("2024-01-01"), ]
+panel <- yield_panel(recent, units = "percent", maturity_unit = "months",
+                     issuer = "US")
+m <- curve_matrix(panel)
+dim(m)
+m[1:3, c("12", "60", "120")]    # decimals, not percent
+}

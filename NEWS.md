@@ -1,7 +1,7 @@
-# termpremia 0.0.0.9000
+# termpremia 0.1.0
 
-First public release, for feedback. **The API is not yet stable** — it may
-change before the first CRAN submission. Pin a commit if you build on it.
+First release. **The API may still change while the version is 0.x**;
+breaking changes will be listed here. Pin a version if you build on it.
 
 ## Estimation
 

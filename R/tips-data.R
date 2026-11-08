@@ -79,11 +79,11 @@
 #'
 #' @seealso [atsm_real()], [fred_series()]
 #'
-#' @examples
-#' \dontrun{
-#' tips <- gsw_tips(cache = "feds200805.csv")
+#' @examplesIf interactive()
+#' # Kept in the session's temporary directory; a real script would cache it
+#' # somewhere permanent.
+#' tips <- gsw_tips(cache = file.path(tempdir(), "feds200805.csv"))
 #' str(tips)
-#' }
 #'
 #' @export
 gsw_tips <- function(maturities = 23:120,
@@ -319,11 +319,10 @@ fetch_to_file <- function(url, cache, quiet, what, fileext = ".csv") {
 #'
 #' @seealso [atsm_real()], [gsw_tips()]
 #'
-#' @examples
-#' \dontrun{
+#' @examplesIf interactive()
 #' cpi <- fred_series("CPIAUCNS")
 #' ff <- fred_series("DFF", at_dates = unique(gsw_monthly$date))
-#' }
+#' tail(ff)
 #'
 #' @export
 fred_series <- function(series_id,

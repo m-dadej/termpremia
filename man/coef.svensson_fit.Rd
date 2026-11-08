@@ -22,3 +22,18 @@ it. Nelson-Siegel fits have \code{beta3 = 0} and \code{tau2 = NA}.
 \description{
 Parameters of a fitted curve
 }
+\examples{
+tenors <- c(3, 6, 12, 24, 36, 60, 84, 120)
+sparse <- gsw_monthly[gsw_monthly$maturity \%in\% tenors &
+                      gsw_monthly$date >= as.Date("2024-01-01"), ]
+panel <- yield_panel(sparse, units = "percent", maturity_unit = "months",
+                     issuer = "US")
+fit <- svensson_fit(panel, yield_type = "zero", check = FALSE)
+
+cf <- coef(fit)
+head(cf)
+
+# The parameters give the curve at any maturity, here 1, 5 and 10 years
+svensson_curve(cf, maturity = c(1, 5, 10))[1:3, ]
+
+}

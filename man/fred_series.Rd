@@ -53,11 +53,11 @@ nothing here is redistributed.
 }
 
 \examples{
-\dontrun{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 cpi <- fred_series("CPIAUCNS")
 ff <- fred_series("DFF", at_dates = unique(gsw_monthly$date))
-}
-
+tail(ff)
+\dontshow{\}) # examplesIf}
 }
 \seealso{
 \code{\link[=atsm_real]{atsm_real()}}, \code{\link[=gsw_tips]{gsw_tips()}}

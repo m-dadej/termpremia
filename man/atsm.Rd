@@ -151,8 +151,14 @@ rather than a sequence; \code{"brw"} targets the persistence of the dynamics and
 }
 
 \examples{
-panel <- yield_panel(gsw_monthly, units = "percent",
-                     maturity_unit = "months", issuer = "US")
+# 1990-2007: a sample that ends before US rates reached the zero lower
+# bound, where Gaussian models like this one misbehave. The full 1961-2024
+# fit, and what the model reports about the bound, are in
+# vignette("validation").
+us <- gsw_monthly[gsw_monthly$date >= as.Date("1990-01-01") &
+                  gsw_monthly$date <= as.Date("2007-12-31"), ]
+panel <- yield_panel(us, units = "percent", maturity_unit = "months",
+                     issuer = "US")
 fit <- atsm(panel, n_factors = 5)
 fit
 

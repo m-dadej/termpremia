@@ -91,11 +91,12 @@ which is what a monthly panel means in any case; months absent from
 }
 
 \examples{
-\dontrun{
-tips <- gsw_tips(cache = "feds200805.csv")
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+# Kept in the session's temporary directory; a real script would cache it
+# somewhere permanent.
+tips <- gsw_tips(cache = file.path(tempdir(), "feds200805.csv"))
 str(tips)
-}
-
+\dontshow{\}) # examplesIf}
 }
 \references{
 Gurkaynak, R. S., B. Sack and J. H. Wright (2010). "The TIPS yield curve

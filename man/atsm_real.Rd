@@ -141,25 +141,30 @@ persistence estimate downstream.
 }
 
 \examples{
-\dontrun{
-nom <- gsw_monthly
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+# Downloads the GSW TIPS curve and two FRED series. `align_to` puts the
+# TIPS month-ends on the nominal curve's dates; see gsw_tips().
+tips <- gsw_tips(align_to = unique(gsw_monthly$date))
+
+nom <- gsw_monthly[, c("date", "maturity", "yield")]
 nom$curve <- "nominal"
-tips <- gsw_tips()
-tips$curve <- "tips"
+rea <- tips[, c("date", "maturity", "yield")]
+rea$curve <- "tips"
 
 panel <- yield_panel(
-  rbind(nom[, c("date", "maturity", "yield", "curve")],
-        tips[, c("date", "maturity", "yield", "curve")]),
-  curve = "curve", units = "percent", maturity_unit = "months",
+  rbind(nom, rea), curve = "curve", units = "percent",
+  maturity_unit = "months",
   instrument = c(nominal = "government", tips = "tips"), issuer = "US"
 )
 
+# CPI-U, not seasonally adjusted, and the effective federal funds rate
 cpi <- fred_series("CPIAUCNS")
-fit <- atsm_real(panel, inflation = cpi,
-                 short_rate = fred_series("DFF", frequency = "monthly"))
-fit
-}
+ff <- fred_series("DFF", at_dates = panel$dates)
 
+fit <- atsm_real(panel, inflation = cpi, short_rate = ff,
+                 short_rate_units = "percent")
+fit
+\dontshow{\}) # examplesIf}
 }
 \references{
 Abrahams, M., T. Adrian, R. K. Crump, E. Moench and R. Yu (2016).

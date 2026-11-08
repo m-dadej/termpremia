@@ -24,3 +24,19 @@ data is evaluated at a higher frequency: the parameters need monthly excess
 returns to estimate, but the decomposition itself needs only the factors on
 the date in question.
 }
+\examples{
+us <- gsw_monthly[gsw_monthly$date >= as.Date("1980-01-01") &
+                  gsw_monthly$date <= as.Date("2007-12-31"), ]
+as_panel <- function(d) {
+  yield_panel(d, units = "percent", maturity_unit = "months",
+              issuer = "US")
+}
+early <- as_panel(us[us$date <= as.Date("2004-12-31"), ])
+late <- as_panel(us[us$date > as.Date("2004-12-31"), ])
+
+# Estimated to 2004, then applied to 2005-2007 with the parameters fixed
+fit <- atsm(early, n_factors = 5)
+out <- predict(fit, late)
+head(out[out$maturity == 120, ])
+
+}

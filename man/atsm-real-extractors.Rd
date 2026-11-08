@@ -72,3 +72,29 @@ ask for it when the model was fitted without a liquidity factor, rather
 than silently returning the unadjusted number.
 }
 
+\examples{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
+# Downloads the GSW TIPS curve and two FRED series; see atsm_real().
+tips <- gsw_tips(align_to = unique(gsw_monthly$date))
+nom <- gsw_monthly[, c("date", "maturity", "yield")]
+nom$curve <- "nominal"
+rea <- tips[, c("date", "maturity", "yield")]
+rea$curve <- "tips"
+panel <- yield_panel(
+  rbind(nom, rea), curve = "curve", units = "percent",
+  maturity_unit = "months",
+  instrument = c(nominal = "government", tips = "tips"), issuer = "US"
+)
+fit <- atsm_real(panel, inflation = fred_series("CPIAUCNS"),
+                 short_rate = fred_series("DFF", at_dates = panel$dates),
+                 short_rate_units = "percent")
+
+# Ten-year breakeven, split into its two parts
+be <- breakeven(fit, maturity = 120)
+ei <- expected_inflation(fit, maturity = 120)
+irp <- inflation_risk_premium(fit, maturity = 120)
+max(abs(be$value - (ei$value + irp$value)))    # exact, by construction
+
+tail(real_term_premium(fit, maturity = 120))
+\dontshow{\}) # examplesIf}
+}

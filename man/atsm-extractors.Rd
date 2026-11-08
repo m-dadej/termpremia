@@ -33,3 +33,21 @@ Extract components of a fitted decomposition
 life of an \code{n}-month bond, which is the risk-neutral yield -- not an
 instantaneous forecast of the policy rate.
 }
+\examples{
+# 1990-2007, before the zero lower bound; see atsm()
+us <- gsw_monthly[gsw_monthly$date >= as.Date("1990-01-01") &
+                  gsw_monthly$date <= as.Date("2007-12-31"), ]
+panel <- yield_panel(us, units = "percent", maturity_unit = "months",
+                     issuer = "US")
+fit <- atsm(panel, n_factors = 5)
+
+tp <- term_premium(fit, maturity = c(24, 120))
+tail(tp)
+
+# The fitted yield is the risk-neutral yield plus the term premium
+rn <- risk_neutral(fit, maturity = 120)
+yhat <- fitted(fit)
+yhat <- yhat[yhat$maturity == 120, ]
+max(abs(yhat$value - (rn$value + tp$value[tp$maturity == 120])))
+
+}

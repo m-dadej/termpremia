@@ -79,12 +79,10 @@
 #'
 #' @seealso [atsm_real()], [ons_rpi()], [gsw_tips()]
 #'
-#' @examples
-#' \dontrun{
+#' @examplesIf interactive()
 #' nom <- boe_yield_curve("nominal", end = "2012-12-31")
 #' rea <- boe_yield_curve("real", end = "2012-12-31")
 #' mean(nom$extrapolated)
-#' }
 #'
 #' @export
 boe_yield_curve <- function(type = c("nominal", "real"),
@@ -410,11 +408,9 @@ boe_check_interpolation <- function(curve, holdout = 84L, tol = 0.01) {
 #'
 #' @seealso [atsm_real()], [boe_yield_curve()]
 #'
-#' @examples
-#' \dontrun{
+#' @examplesIf interactive()
 #' rpi <- ons_rpi(extend_to = "1984-12-01")
 #' sum(rpi$chained)
-#' }
 #'
 #' @export
 ons_rpi <- function(extend_to = NULL, quiet = TRUE, check = TRUE) {

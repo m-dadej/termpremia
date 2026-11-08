@@ -34,11 +34,31 @@
 #'
 #' @seealso [atsm_real()], [forward_rate()]
 #'
-#' @examples
-#' \dontrun{
-#' fit <- atsm_real(monthly_panel, inflation = cpi)
-#' predict(fit, weekly_panel)
+#' @examplesIf interactive()
+#' # Downloads the GSW TIPS curve and two FRED series; see atsm_real().
+#' tips <- gsw_tips(align_to = unique(gsw_monthly$date))
+#' nom <- gsw_monthly[, c("date", "maturity", "yield")]
+#' nom$curve <- "nominal"
+#' rea <- tips[, c("date", "maturity", "yield")]
+#' rea$curve <- "tips"
+#' long <- rbind(nom, rea)
+#'
+#' as_panel <- function(d) {
+#'   yield_panel(d, curve = "curve", units = "percent",
+#'               maturity_unit = "months",
+#'               instrument = c(nominal = "government", tips = "tips"),
+#'               issuer = "US")
 #' }
+#' early <- as_panel(long[long$date <= as.Date("2019-12-31"), ])
+#' late <- as_panel(long[long$date > as.Date("2019-12-31"), ])
+#'
+#' fit <- atsm_real(early, inflation = fred_series("CPIAUCNS"),
+#'                  short_rate = fred_series("DFF", at_dates = early$dates),
+#'                  short_rate_units = "percent")
+#'
+#' # 2020 onwards, with every parameter held at its estimate to 2019
+#' out <- predict(fit, late)
+#' tail(out[out$maturity == 120, ])
 #'
 #' @export
 predict.atsm_real_fit <- function(object, newdata, liquidity = NULL, ...) {
@@ -175,12 +195,24 @@ project_real_factors <- function(object, y_nom, y_real, liquidity) {
 #'
 #' @return `x`, invisibly. Called for the side effect.
 #'
-#' @examples
-#' \dontrun{
-#' fit <- atsm_real(panel, inflation = cpi)
+#' @examplesIf interactive()
+#' # Downloads the GSW TIPS curve and two FRED series; see atsm_real().
+#' tips <- gsw_tips(align_to = unique(gsw_monthly$date))
+#' nom <- gsw_monthly[, c("date", "maturity", "yield")]
+#' nom$curve <- "nominal"
+#' rea <- tips[, c("date", "maturity", "yield")]
+#' rea$curve <- "tips"
+#' panel <- yield_panel(
+#'   rbind(nom, rea), curve = "curve", units = "percent",
+#'   maturity_unit = "months",
+#'   instrument = c(nominal = "government", tips = "tips"), issuer = "US"
+#' )
+#' fit <- atsm_real(panel, inflation = fred_series("CPIAUCNS"),
+#'                  short_rate = fred_series("DFF", at_dates = panel$dates),
+#'                  short_rate_units = "percent")
+#'
 #' plot(fit)                     # breakeven decomposition
 #' plot(fit, type = "real")      # the two term premia
-#' }
 #'
 #' @export
 plot.atsm_real_fit <- function(x,
