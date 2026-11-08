@@ -5,11 +5,11 @@ This is a new submission.
 ## Test environments
 
 * Local: Windows 11, R 4.5.2 and R 4.3.2
+* GitHub Actions: macOS (R 4.6.2), Windows (R 4.6.1), Ubuntu (R 4.6.2,
+  R-devel 4.7.0, R 4.5.3 and R 4.3.3, the declared minimum)
 
-<!-- Before submitting: push, and once the GitHub Actions matrix passes add
-     "GitHub Actions: macOS, Windows and Ubuntu (R release), Ubuntu (R devel,
-     R oldrel-1 and R 4.3)" above. Run devtools::check_win_devel() and add
-     its result too. Then delete this comment. -->
+<!-- Before submitting: run devtools::check_win_devel(), add its result
+     above ("win-builder: R-devel"), then delete this comment. -->
 
 ## R CMD check results
 
@@ -18,7 +18,8 @@ This is a new submission.
 * This is a new submission.
 
 Any words flagged as possibly misspelled in DESCRIPTION are author names
-(Adrian, Crump, Moench, Rudebusch, Orphanides, Abrahams, Siegel, Svensson).
+(Adrian, Crump, Moench, Rudebusch, Orphanides, Abrahams, Yu, Siegel,
+Svensson).
 
 ## Notes for reviewers
 
