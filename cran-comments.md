@@ -7,9 +7,7 @@ This is a new submission.
 * Local: Windows 11, R 4.5.2 and R 4.3.2
 * GitHub Actions: macOS (R 4.6.2), Windows (R 4.6.1), Ubuntu (R 4.6.2,
   R-devel 4.7.0, R 4.5.3 and R 4.3.3, the declared minimum)
-
-<!-- Before submitting: run devtools::check_win_devel(), add its result
-     above ("win-builder: R-devel"), then delete this comment. -->
+* win-builder: R-devel
 
 ## R CMD check results
 
@@ -17,9 +15,10 @@ This is a new submission.
 
 * This is a new submission.
 
-Any words flagged as possibly misspelled in DESCRIPTION are author names
-(Adrian, Crump, Moench, Rudebusch, Orphanides, Abrahams, Yu, Siegel,
-Svensson).
+The words flagged as possibly misspelled in DESCRIPTION are the surnames of
+the cited authors (Abrahams, Crump, Moench, Orphanides, Rudebusch, Siegel,
+Svensson, Yu) and two standard finance terms: "premia" (plural of risk
+premium) and "breakeven" (breakeven inflation).
 
 ## Notes for reviewers
 

@@ -60,7 +60,7 @@ atsm(panel, n_factors = 5, p_dynamics = "survey", survey = surveys)
 ```
 
 Use both horizons. Short-horizon forecasts alone make the far end *worse*; see
-[`analysis/validate-spf.R`](analysis/validate-spf.R).
+[`analysis/validate-spf.R`](https://github.com/m-dadej/termpremia/blob/main/analysis/validate-spf.R).
 
 Bring your own curve — the package is curve-agnostic and takes any zero-coupon
 panel, in long or wide form:
@@ -90,7 +90,7 @@ atsm(dense, n_factors = 5, short_rate = my_bill_rate)
 
 Rebuilding the Bank of England curve from eight tenors this way moves its
 10-year term premium by 4bp on average, with a 0.999 correlation in monthly
-changes ([`analysis/validate-svensson-fit.R`](analysis/validate-svensson-fit.R)).
+changes ([`analysis/validate-svensson-fit.R`](https://github.com/m-dadej/termpremia/blob/main/analysis/validate-svensson-fit.R)).
 Two things to know. First, the one-month yield below your shortest tenor is an
 extrapolation, which is why `atsm()` warns if you leave it as the short rate.
 Second, fixing the decay parameters, as Diebold–Li do, limits the curve to
@@ -186,7 +186,7 @@ implicit.
 
 None of this is US-only. `boe_yield_curve()` and `ons_rpi()` fetch the UK
 inputs, and the paper's own UK specification runs without a liquidity factor;
-see [`analysis/validate-uk.R`](analysis/validate-uk.R).
+see [`analysis/validate-uk.R`](https://github.com/m-dadej/termpremia/blob/main/analysis/validate-uk.R).
 
 ## Reproducibility
 
@@ -210,13 +210,13 @@ short rate.
 The joint real-nominal model has no published benchmark series to correlate
 against, so it is checked against every number its source paper reports. On the
 paper's own US sample — 1999:01–2014:11, T = 191, matched exactly —
-[`analysis/replicate-acmy.R`](analysis/replicate-acmy.R) keeps nominal and TIPS
+[`analysis/replicate-acmy.R`](https://github.com/m-dadej/termpremia/blob/main/analysis/replicate-acmy.R) keeps nominal and TIPS
 pricing errors inside the stated tolerances and reproduces both headline
 findings: expected inflation stable at 2.06% on the five-to-ten year forward
 with a 17bp standard deviation, against their "2.1 to 2.5%" and "quite stable",
 and a variance decomposition led by the real term premium with the inflation
 risk premium a minor contributor.
-[`analysis/validate-uk.R`](analysis/validate-uk.R) does the same against the
+[`analysis/validate-uk.R`](https://github.com/m-dadej/termpremia/blob/main/analysis/validate-uk.R) does the same against the
 Supplementary Appendix's UK specification, landing on its T = 336 sample
 without tuning anything — the start date turns out to be a property of the Bank
 of England's real curve — and fitting the real curve to 1.17bp RMSE.
